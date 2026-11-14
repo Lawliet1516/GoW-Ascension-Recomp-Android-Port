@@ -1,0 +1,311 @@
+[
+ {
+  "ea": "0x718e00",
+  "span": "0xb00",
+  "seen": true
+ },
+ {
+  "ea": "0x719900",
+  "span": "0x940",
+  "seen": true
+ },
+ {
+  "ea": "0x71a240",
+  "span": "0x920",
+  "seen": false
+ },
+ {
+  "ea": "0x71ab60",
+  "span": "0x7c0",
+  "seen": true
+ },
+ {
+  "ea": "0x71b320",
+  "span": "0xff0",
+  "seen": false
+ },
+ {
+  "ea": "0x71c310",
+  "span": "0x860",
+  "seen": true
+ },
+ {
+  "ea": "0x71cb70",
+  "span": "0x1c60",
+  "seen": false
+ },
+ {
+  "ea": "0x71e7d0",
+  "span": "0x6d0",
+  "seen": true
+ },
+ {
+  "ea": "0x71eea0",
+  "span": "0x6a0",
+  "seen": true
+ },
+ {
+  "ea": "0x71f540",
+  "span": "0x550",
+  "seen": false
+ },
+ {
+  "ea": "0x71fa90",
+  "span": "0x610",
+  "seen": false
+ },
+ {
+  "ea": "0x7200a0",
+  "span": "0xba0",
+  "seen": false
+ },
+ {
+  "ea": "0x720c40",
+  "span": "0x450",
+  "seen": true
+ },
+ {
+  "ea": "0x721090",
+  "span": "0xe70",
+  "seen": false
+ },
+ {
+  "ea": "0x721f00",
+  "span": "0x4e0",
+  "seen": true
+ },
+ {
+  "ea": "0x7223e0",
+  "span": "0x4e0",
+  "seen": false
+ },
+ {
+  "ea": "0x7228c0",
+  "span": "0x4e0",
+  "seen": true
+ },
+ {
+  "ea": "0x722da0",
+  "span": "0x560",
+  "seen": false
+ },
+ {
+  "ea": "0x723c00",
+  "span": "0x3c0",
+  "seen": true
+ },
+ {
+  "ea": "0x723fc0",
+  "span": "0xcf0",
+  "seen": false
+ },
+ {
+  "ea": "0x724cb0",
+  "span": "0x4a0",
+  "seen": true
+ },
+ {
+  "ea": "0x725150",
+  "span": "0x340",
+  "seen": true
+ },
+ {
+  "ea": "0x725490",
+  "span": "0x330",
+  "seen": false
+ },
+ {
+  "ea": "0x7261f0",
+  "span": "0x1bd0",
+  "seen": false
+ },
+ {
+  "ea": "0x727dc0",
+  "span": "0x230",
+  "seen": true
+ },
+ {
+  "ea": "0x727ff0",
+  "span": "0x2b0",
+  "seen": false
+ },
+ {
+  "ea": "0x7282a0",
+  "span": "0x2b0",
+  "seen": true
+ },
+ {
+  "ea": "0x728550",
+  "span": "0x2a0",
+  "seen": false
+ },
+ {
+  "ea": "0x7287f0",
+  "span": "0x2a0",
+  "seen": true
+ },
+ {
+  "ea": "0x728a90",
+  "span": "0xe60",
+  "seen": false
+ },
+ {
+  "ea": "0x7298f0",
+  "span": "0x150",
+  "seen": true
+ },
+ {
+  "ea": "0x729a40",
+  "span": "0x3c0",
+  "seen": false
+ },
+ {
+  "ea": "0x729e00",
+  "span": "0x140",
+  "seen": true
+ },
+ {
+  "ea": "0x729f40",
+  "span": "0xc0",
+  "seen": true
+ },
+ {
+  "ea": "0x6af1b0",
+  "span": "0x32e0",
+  "seen": true,
+  "entries": [
+   "0x6b1548",
+   "0x6b1588",
+   "0x6b1d50",
+   "0x6b2054",
+   "0x6b2080"
+  ]
+ },
+ {
+  "ea": "0x6d66b0",
+  "span": "0xb80",
+  "seen": true,
+  "entries": [
+   "0x6d6cf0",
+   "0x6d6f84",
+   "0x6d6fb0"
+  ]
+ },
+ {
+  "ea": "0x716730",
+  "span": "0x2450",
+  "seen": true,
+  "entries": [
+   "0x7181b8",
+   "0x7185d0",
+   "0x71882c",
+   "0x718858"
+  ]
+ },
+ {
+  "ea": "0x723300",
+  "span": "0x450",
+  "seen": false
+ },
+ {
+  "ea": "0x723750",
+  "span": "0x4b0",
+  "seen": false
+ },
+ {
+  "ea": "0x7257c0",
+  "span": "0x370",
+  "seen": false
+ },
+ {
+  "ea": "0x725b30",
+  "span": "0x370",
+  "seen": false
+ },
+ {
+  "ea": "0x725ea0",
+  "span": "0x350",
+  "seen": false
+ },
+ {
+  "ea": "0x727700",
+  "span": "0x240",
+  "seen": true
+ },
+ {
+  "ea": "0x71ba70",
+  "span": "0x8a0",
+  "seen": true
+ },
+ {
+  "ea": "0x727940",
+  "span": "0x240",
+  "seen": true
+ },
+ {
+  "ea": "0x727b80",
+  "span": "0x240",
+  "seen": true
+ },
+ {
+  "ea": "0x729b80",
+  "span": "0x140",
+  "seen": true
+ },
+ {
+  "ea": "0x729cc0",
+  "span": "0x140",
+  "seen": true
+ },
+ {
+  "ea": "0x71d990",
+  "span": "0xe40",
+  "seen": true
+ },
+ {
+  "ea": "0x7295e0",
+  "span": "0x310",
+  "seen": true
+ },
+ {
+  "ea": "0x721a80",
+  "span": "0x480",
+  "seen": true
+ },
+ {
+  "ea": "0x721540",
+  "span": "0x540",
+  "seen": true
+ },
+ {
+  "ea": "0x7273a0",
+  "span": "0x360",
+  "seen": true
+ },
+ {
+  "ea": "0x726540",
+  "span": "0x2d0",
+  "seen": true
+ },
+ {
+  "ea": "0x726810",
+  "span": "0xb90",
+  "seen": true
+ },
+ {
+  "ea": "0x713330",
+  "span": "0x33c0",
+  "seen": true,
+  "entries": [
+   "0x715fe8"
+  ]
+ },
+ {
+  "ea": "0x6ac8b0",
+  "span": "0x28b0",
+  "seen": true,
+  "entries": [
+   "0x6aebd0"
+  ]
+ }
+]

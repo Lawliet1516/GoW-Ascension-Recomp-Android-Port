@@ -1,0 +1,6 @@
+# Your disc, your decrypted EBOOT.ELF and everything made from them.
+/work/
+# Build trees.
+build/
+__pycache__/
+*.pyc

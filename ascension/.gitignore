@@ -1,0 +1,24 @@
+# Nothing made from the game's own files belongs in this repository.
+# scripts\windows\prepare.ps1 writes these from YOUR decrypted EBOOT.ELF:
+/src/
+/meta/spu/
+/meta/patch_sites.json
+/host/ascension_patch_table.inc
+# The emulated HDD (saves, game data) the game writes.
+/gamedata/
+# Local build output.
+/build/
+/release/
+__pycache__/
+*.pyc
+# Frame captures: frames of the game itself.
+/captures/
+# Launcher artwork and music made from your disc, installed mods.
+/launcher/assets/
+/mods/
+# Local settings and your own console key file (never committed).
+/.env
+/.env.*
+!/.env.example
+keys.txt
+/launcher/keys.txt

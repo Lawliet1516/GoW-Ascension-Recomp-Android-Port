@@ -1,0 +1,114 @@
+# RPCS3-format patches for God of War: Ascension 1.00 (BCES01741), the version
+# this port is built from. RPCS3's own patch file only has PPU patches for the
+# 1.04 and 1.12 updates; patches ported to 1.00 go here, under this
+# executable's hash (tools\rpcs3_patch.py info prints it).
+#
+# Ported from RPCS3's 1.04 patches (PPU-3a63ecc6e9b81a984d2fe0a481febc3e26b57810,
+# GOWA.SELF from the official 1.04 update, decrypted and hash-checked). Each
+# 1.04 address was located in 1.00 by matching the surrounding instructions
+# with immediates and branch targets masked (a unique match of 21 to 131
+# instructions each), constant pools by their exact float sequences, and the
+# data addresses through the instructions that reference them. The 1.04
+# address is in the comment of every line.
+Version: 1.2
+
+Anchors:
+  gowa_100_title: &gowa_100_title
+    "God of War: Ascension":
+      BCES01741: [ 01.00 ]
+
+PPU-5842e8bc5420b6d10eee4cf24243e7d8647e477d:
+  "Unlock FPS":
+    Games: *gowa_100_title
+    Author: "ZEROx, illusion (1.04); ported to 1.00"
+    Notes: "Unlocks the internal timestep: the game runs at the right speed at any frame rate. Target 60 fps. Port of RPCS3's 1.04 patch, with two fixes for slower PCs: the level loader gets its original time per call again (3.25 ms instead of 0.2 ms: faster loading), and one frame never moves the game more than 66.7 ms, as on the PS3."
+    Patch Version: 2.1
+    Patch:
+      - [ bef32, 0x00377694, 1000 ]        # 0x0039e284: 59.94 Hz refresh constant
+      - [ bef32, 0x002b3c3c, 6673 ]        # 0x002cae2c: largest step x100 (400.0 = 4 vblanks); RPCS3 uses 10000 (100 ms), 6673 = 66.7 ms = the original's 4 vblanks (PC port 2.1)
+      - [ bef32, 0x0081af14, 60 ]          # 0x0083b2cc: target FPS, main float
+      - [ be32, 0x002b3be8, 0x60000000 ]   # 0x002cadd8: keep the store from overwriting it
+      - [ be16, 0x002ae1b6, 0x913c ]       # 0x002c537e: 1000.0f gameplay speed scaling
+      - [ be16, 0x002b3cd6, 0x913c ]       # 0x002caec6: 1000.0f sync
+      - [ be16, 0x002b3d7e, 0x913c ]       # 0x002caf6e: 1000.0f sync
+      - [ be16, 0x003c838a, 0x913c ]       # 0x003ef71a: 1000.0f video playback speed scaling
+      # PC port 2.1: the ms unit also shrank the WAD loader's per-call time budget (ticks_per_unit / 5) from 3.34 to 0.2 ms
+      - [ be32, 0x003CA134, 0x1F63000D ]   # WAD loader state machine (func 0x3C9FBC) budget = ticks_per_unit/5: mulhdu r27,r4,r3 -> mulli r27,r3,13; then >>2 = 3.25 ms (orig 7F641812)
+      - [ be32, 0x0003CD38, 0x1C63000D ]   # WAD init loop (func 0x3C834) budget: mulhdu r3,r4,r3 -> mulli r3,r3,13; then >>2 = 3.25 ms (orig 7C641812)
+  "Disable Depth of Field":
+    Games: *gowa_100_title
+    Author: "ZEROx (1.04); ported to 1.00"
+    Notes: "Port of RPCS3's 1.04 patch."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x0040559c, 0x38a00000 ]   # 0x004342bc
+  "Disable Motion Blur":
+    Games: *gowa_100_title
+    Author: "ZEROx (1.04); ported to 1.00"
+    Notes: "Port of RPCS3's 1.04 patch."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x00408af0, 0x38a00000 ]   # 0x00437810
+  "Disable MLAA":
+    Games: *gowa_100_title
+    Author: "illusion, ZEROx (1.04); ported to 1.00"
+    Notes: "The PPU side of RPCS3's MLAA switch (the SPU MLAA patch is separate). Port of RPCS3's 1.04 patch."
+    Patch Version: 1.0
+    Patch:
+      - [ byte, 0x0081c9b7, 0x00 ]         # 0x0083ce77
+      - [ be32, 0x00369b34, 0x60000000 ]   # 0x00390724
+      - [ be32, 0x00369b64, 0x60000000 ]   # 0x00390754
+  "Cheat: God Mode":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "Kratos takes no damage from hits, using the developers' God Mode check that the retail game never switches on. Deaths that do not come from hits (some traps, falls, failed button prompts) may still kill."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x0050C848, 0x38600001 ]   # goPlayer vtable +0x3C "invulnerable?": lbz r3,2(r3) -> li r3,1; func_00085440 then skips the damage (orig 88630002)
+  "Cheat: Infinite Magic":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "The magic meter never drains (the Boat Captain's Idol artifact, without New Game+)."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x00231FD4, 0x38600001 ]   # tMagicMeter add: lbz r3,3 -> li r3,1: negative adds skipped (orig 88630003)
+      - [ be32, 0x00232198, 0x38600001 ]   # tMagicMeter can-afford: lbz r3,3 -> li r3,1 (orig 88630003)
+  "Cheat: Infinite Rage":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "The rage meter stays full (the Prisoner's Oath Stone artifact, without New Game+)."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x00230F6C, 0x38600001 ]   # tRageMeter get: lbz r3,4 -> li r3,1: reports the maximum (orig 88630004)
+      - [ be32, 0x00231158, 0x38600001 ]   # tRageMeter add: lbz r3,4 -> li r3,1: no change to the meter (orig 88630004)
+  "Cheat: Health Regeneration":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "Health slowly refills while Kratos is alive (Orkos' Cloak artifact, without New Game+)."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x002331FC, 0x38A00001 ]   # tHealthMeter update: lbz r5,0x17(r4) -> li r5,1 (orig 88A40017)
+  "Cheat: Red Orbs x10":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "Ten times the red orbs (the Oracle Seeker's Offering artifact, without New Game+)."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x000A16CC, 0x38600001 ]   # player orb multiplier: lbz r3,0x14 -> li r3,1 (orig 88630014)
+  "Cheat: No Cooldown":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "Item and ability cooldowns are set to zero: the developers' no-cooldown flag (g_cheats+0x10), never switched on in the retail game. Experimental."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x001BDC60, 0x38A00001 ]   # cooldown start func_001BDBB8: lbz r5,0x10(r4) -> li r5,1: duration 0.0 (orig 88A40010)
+  "Cheat: Unlock All":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "Unlocked while ticked: Titan difficulty, New Game+ and its costumes, the extras videos, and the 10 artifacts with known cheats (switch them on in New Game+). The unlocks are not written to your save: untick it and they are locked again (games you start or save meanwhile are kept). Chapters you have not reached stay locked (there is no save data for them)."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x0001A62C, 0x3860000F ]   # difficultyBeaten getter: ld r3,unlock bits -> li r3,0xF: all four difficulties beaten (orig E86316E8)
+      - [ be32, 0x00215884, 0x3880FFFF ]   # UI treasure[i]: ld r4,unlock bits -> li r4,-1 (orig E88416E8)
+      - [ be32, 0x00570534, 0x38A003FF ]   # UI urnsAcquired (artifacts collected): lwz r5 -> li r5,0x3FF, the 10 known artifacts (orig 80A516F0)
+      - [ be32, 0x0009CDD8, 0x38A003FF ]   # artifact cheats copier func_0009CD68: lwz r5 -> li r5,0x3FF (orig 80A516F0)

@@ -1,0 +1,2 @@
+# Supporters shown on the launcher's Support page: one name per line.
+# Lines starting with # are skipped. Add Patreon supporters here before each release.
