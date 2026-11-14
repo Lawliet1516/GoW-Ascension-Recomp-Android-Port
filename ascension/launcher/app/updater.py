@@ -28,7 +28,7 @@ from .config import ROOT, VERSION
 
 # The repository's current name: the old one (GoW-Ascension-PC-Port) only redirects, and the redirect
 # loses the token, so a private repository answered "not found" (found 2026-11-11).
-REPO = 'bc160201983/Ascension-Recomp'
+REPO = 'bc160201983/GoW-Ascension-Recomp'   # the public repository (2026-11-14)
 API = f'https://api.github.com/repos/{REPO}'
 RELEASES_PAGE = f'https://github.com/{REPO}/releases/latest'
 INSTALL = ROOT.parent.parent       # the release folder: the launcher exe, runtime\, ascension-recomp\

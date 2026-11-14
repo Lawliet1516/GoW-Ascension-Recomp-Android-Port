@@ -22,6 +22,93 @@ It is a **static recompilation**, not an emulator. Tools in this repository tran
 
 **Single player only.** Online and multiplayer were removed from this source release. Nothing in it connects to a game server.
 
+## Download (ready to play)
+
+The [Releases](../../releases/latest) page has **GodOfWarAscension-0.1.31-windows.zip**: extract it anywhere and run the launcher. You still need your own copy of the game. Already playing an older version? Extract it **over your old folder**, or into a new folder and start the launcher once: your saves are copied over.
+
+The ready-made build includes the hand-written native SPU code, so it is faster in heavy fights than a build made from this source alone.
+
+## What has been fixed so far
+
+Highlights from 0.1.0 (2026-10-30) to 0.1.31. The full list is in [CHANGELOG.md](CHANGELOG.md).
+
+**Speed**
+- More of the game runs as real PC code (SPU jobs rewritten natively): much faster on 4-8 core CPUs (0.1.12, 0.1.22).
+- Occlusion culling: objects hidden behind walls are not drawn (0.1.17, 0.1.21).
+- Cheaper draws in the graphics thread, and since 0.1.31 those speed-ups are on for everyone, not only with the FPS counter shown.
+- Thread placement tuned for 6-core CPUs, 16-core Ryzen X3D CPUs, and switched off where it hurt (8-core CPUs, Intel CPUs with E-cores).
+- Fewer CPU cycles wasted waiting; other programs slow the game down less.
+
+**Stutter**
+- Shaders compiled before playing, with a recorded set of 13,425 pipelines shipped in the package.
+- Shaders built in the background; no more stutter at start-up and after loading screens; no texture stutter after loads.
+- Optional "Fewer shader stutters" setting (NVIDIA): a stand-in shader is drawn while the real one is built, also right after loading screens.
+
+**Crashes and freezes**
+- Freezes where the picture stopped but the sound kept playing (0.1.13, 0.1.25).
+- Freezes every few seconds on 8-core CPUs (0.1.23), start-up hang with SPU MLAA on (0.1.24), boot crash (0.1.10), "Not Responding" window (0.1.27).
+- Falling through the floor on slower PCs (0.1.20).
+
+**Graphics**
+- Missing floors and objects, garbled scenery, striped textures, white patches on Kratos's face at high resolutions, glowing blobs on NVIDIA, blown-out lighting on AMD, rooftop shimmer.
+- Native 1080p, 1440p, 4K and 5K rendering; SMAA, AMD FSR 3.1, sharpening, anisotropic filtering.
+- Glow (bloom) made at full resolution at 1440p/4K: smooth instead of dotted, brightness within 1% of the PS3 (0.1.31).
+
+**Controls, saves and launcher**
+- Controllers: full stick range on diagonals, right-stick evade, controllers that stopped after cutscenes, wireless controllers that froze during heavy vibration (0.1.31).
+- Saves: backups while you play, export and import, the autosave that went to the wrong folder (0.1.27), and saves carried over automatically when you install a new version in a new folder (0.1.30).
+- US disc support, game folder or .iso picked directly (no RPCS3 decrypting), FAT32 split files joined, cheats and patches with tick boxes, PT-BR translation mod, 1.04 sound mix, skip intro and story movies.
+
+## Performance
+
+All numbers are measured (each one says on which PC and how). The game is CPU-heavy: in big fights the PS3's SPU work and the game's main thread, not the graphics card, set the frame rate.
+
+**Test PC: Ryzen 9 9950X3D + RTX 5080**
+
+| Scene | Setup | FPS |
+|---|---|---|
+| Heaviest fight | 1440p window, 2x render scale, 60 cap, all cores | 59-60 (capped) |
+| Rooftop (very busy view) | all cores, FPS cap 240, 0.1.31 build | 106 |
+| Heaviest fight | limited to 6 cores, FPS cap 240 | ~77 |
+| Rooftop | limited to 6 cores, FPS cap 240 | ~51-53 |
+| Heaviest fight | limited to 4 cores, FPS cap 240 | ~48-54 |
+| Rooftop | limited to 4 cores, FPS cap 240, 0.1.31 speed-ups | ~41-45 (was ~38-40) |
+
+The 4- and 6-core rows are this PC limited to fewer cores, which is faster than a real 4- or 6-core CPU.
+
+**Shader stutter (optional "Fewer shader stutters" setting, RTX 5080, empty shader cache)**
+
+| Heaviest fight | Setting off | Setting on |
+|---|---|---|
+| Time frozen waiting for shaders (1440p, 2x) | 3.5 s | 0.5-0.9 s |
+| Freezes of 50 ms or longer | 35 | 4 |
+| Worst 5 seconds | 43 fps | 56 fps |
+| Waiting right after a loading screen (4 cores) | 1.9-2.6 s | ~0.4 s |
+
+**Players' PCs (from their logs)**
+
+| PC | Version | Result |
+|---|---|---|
+| 6-core Ryzen + RX 6750 XT, 4K | 0.1.28 | ~56 fps in busy scenes with Thread placement on |
+| Core i5-14400F + RTX 5070 | 0.1.28 | ~50 fps in lighter areas, 21-25 fps in one heavy area |
+| Laptop, 4P+4E Intel + RTX 4050 Laptop | 0.1.28 | 30 fps (locked by the "Low" preset's 30 fps cap) |
+| 4-core / 8-thread CPU + RX 580 | 0.1.22 | 15-30 fps, 30 fps cap |
+
+## Known issues
+
+- **Videos can show black (sound plays) when "Skip cutscenes" is off.** Keep Skip cutscenes on.
+- **Kratos keeps dying in a cutscene near the end of the game.** Turn on Skip cutscenes for that part.
+- **Kratos's skin turns yellow in one Chapter 29 cutscene** (the "This is Sparta" kick).
+- **Box-shaped patches in some floor lighting and shadows.**
+- **Heavy fights drop below 60 fps on CPUs with 8 cores or fewer**, more on laptops (use Best performance power mode, stay plugged in).
+- **Some PCs with slow per-draw cost** (seen on one i5-14400F): one heavy area runs at 21-25 fps; the cause was not found.
+- **The first visit to a new area can stutter briefly** while new shaders compile (much less with the NVIDIA setting).
+- **"Fewer shader stutters" is tested on NVIDIA only;** the game turns it off on AMD and Intel.
+- **AMD FSR frame generation runs the game at half your refresh rate:** below 120 Hz use Off or Anti-aliasing.
+- **Needs a CPU with AVX2** (no Intel Core 2nd/3rd gen, no AMD FX) and a DirectX 12 card with Shader Model 6 (old Intel HD 4000/4600 graphics usually cannot run it). The launcher says so when this is the reason.
+- **Offline Multiplayer (experimental):** going back to the main MP lobby with the buttons does not always work; hold SELECT + START to quit.
+- **Online multiplayer is not included** in this public version.
+
 ## What is in here
 
 ```
