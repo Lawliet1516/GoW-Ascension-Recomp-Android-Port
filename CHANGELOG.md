@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.32 (beta), 2026-11-15
+
+### Online multiplayer is back in the port
+Community online multiplayer is now part of the normal download (it was only in test packages before).
+- New **Online** page in the launcher: play on a community server, on your own network (LAN), or host your own
+  server (https://github.com/bc160201983/gowa-community-server).
+- **No server is built in.** Type the address of a community server in the Server box, use LAN, or host one.
+- Match codes for private games with friends, a server list with ping and players searching, leaderboards, and an
+  optional Discord status with a Join button.
+- You need your **own Online Pass** (INDEX.EDAT from your PS3) and the same game region as the other players.
+  README-ONLINE.txt in the download explains everything.
+- Offline Multiplayer patches are back too (Patches page, experimental).
+
+### 5.1 surround sound
+The game mixes 5.1 sound, but the port always folded it down to stereo, so surround speakers stayed silent.
+- When Windows is set to 5.1 or 7.1 speakers, the port now sends real 5.1. Stereo setups are unchanged.
+- Measured on a recording of the 6 channels: front, center, subwoofer and both surround channels all carry sound.
+  We could not test it on real surround speakers: please tell us how it sounds.
+
+### Ambient occlusion (new option, off by default)
+- Graphics page -> Lighting -> **Ambient occlusion**: soft contact shadows in corners, under ledges and where
+  characters stand. Not part of the PS3 game.
+- No measurable frame-rate cost on our RTX 5080 test PC (the game is limited by the CPU there).
+
+### For modders
+- **Texture packs:** `LD_TEX_DUMP=<folder>` writes every game texture as a PNG; `LD_TEX_PACK=<folder>` loads your
+  edited or upscaled PNGs (any size) in their place. About 1% slower with a full pack in our test.
+- **Shader edits:** `LD_HLSL_DUMP=<folder>` writes the game's shaders as HLSL; put an edited `ps_<hash>.hlsl` /
+  `vs_<hash>.hlsl` in the folder named by `LD_HLSL_REPLACE` and the game uses it.
+- Both are off unless you set them. Packs are made from the game's own art: share them as the community does,
+  they are not part of this project.
+
 ## 0.1.31 (beta), 2026-11-14 - final update
 
 ### The final update

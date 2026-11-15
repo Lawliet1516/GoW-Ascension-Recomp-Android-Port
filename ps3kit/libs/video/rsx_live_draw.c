@@ -89,6 +89,7 @@ static unsigned long long g_ld_bind_white = 0, g_ld_bind_real = 0, g_ld_bind_sur
 static volatile long g_ld_ps1_vram_ready = 0;
 #include "rsx_restart_cuts.h"
 #include "rsx_tex_decode.h"      /* LD_TEX_FAST: decode_guest_texture's level loops */
+#include "rsx_texpack.h"         /* LD_TEX_DUMP / LD_TEX_PACK: texture packs */
 #include "rsx_vertex_compact.h"
 #include "rsx_vp_decompiler.h"
 static long ld_shader_stats_frame(void);   /* LD_SHADER_STATS, below */
@@ -341,11 +342,11 @@ static HRESULT ld_present(IDXGISwapChain3* sc)
 /* The renderer's own full-screen passes (ld_pp_*): an LD_PP_* target's view
  * at SRV_PP_BASE + k (its RTV at LD_RTV_PP + k), a copy's source after them. */
 #define SRV_PP_BASE       (SRV_REMAP_BASE + MAX_SURFACES)
-#define SRV_CPU_HEAP_SLOTS (SRV_PP_BASE + 16)
+#define SRV_CPU_HEAP_SLOTS (SRV_PP_BASE + 20)   /* LD_AO: + its target and depth view */
 #define LD_RTV_PP         (LD_SWAP_BUFFERS + MAX_SURFACES)
 #define LD_PP_FMTS        8
 enum { LD_PP_COLOR, LD_PP_EDGES, LD_PP_BLEND, LD_PP_OUT, LD_PP_MOVIE, LD_PP_SHARP, LD_PP_RESOLVE, LD_PP_AREA,
-       LD_PP_SEARCH, LD_PP_HOLE0, LD_PP_HOLE1, LD_PP_HOLE2, LD_PP_HOLE3, LD_PP_HOLE_CUR, LD_PP_N };
+       LD_PP_SEARCH, LD_PP_HOLE0, LD_PP_HOLE1, LD_PP_HOLE2, LD_PP_HOLE3, LD_PP_HOLE_CUR, LD_PP_AO, LD_PP_N };
 #define SRV_TABLE_SIZE   16
 /* Tables between two GPU syncs. 4096 wrapped about twice a frame in God of
  * War: Ascension's levels, and each wrap waits for the GPU. 32768 x 16 is
@@ -3654,6 +3655,7 @@ static u32 ld_fd_resolve(ld_flush_reason reason);      /* waits; closes every pa
 static ID3D12CommandList** ld_fd_lists(void);           /* those lists, in order, room for one more */
 static void ld_fd_submitted(u64 v);                     /* they (and the current list) went with fence v */
 static void ld_hole_draw(u32 target, const u32* mrt, u32 n_mrt);   /* LD_HOLE_FILL */
+static void ld_ao_draw(u32 target, u32 zslot, const rsx_dsp_viewport* vp);   /* LD_AO (rsx_ao.inc) */
 static void ld_vx_join(void);
 static int g_ld_oc_in_draw;           /* OCCL_MEASURE: a ZPASS query box is being translated */
 static volatile long g_ld_oc_tick;    /* OCCL_MEASURE: a [draws] window ended ([occl] follows it) */
@@ -5210,6 +5212,32 @@ static ID3D12Resource* decode_guest_volume(const rsx_dsp_texture* t, u32 remap)
     return tex;
 }
 
+/* LD_TEX_PACK (rsx_texpack.c): the pack's RGBA8 replacement for this texture, if it has one.
+ * The module keeps one reference to each replacement it made, so a re-decode (the cache
+ * evicted it) shares that texture: with another reference held, LD_TEX_RECYCLE never
+ * hands it to another texture. */
+static void ld_texpack_ref(void* r, int add)
+{
+    ID3D12Resource* x = (ID3D12Resource*)r;
+    if (add) x->lpVtbl->AddRef(x); else x->lpVtbl->Release(x);
+}
+static ID3D12Resource* ld_texpack_upload(u64 hash, const rsx_dsp_texture* t, u32 n_mips)
+{
+    const rsx_texpack_image* im = NULL; void* kept = NULL;
+    if (!rsx_texpack_find(hash, t->width, t->height, n_mips, (t->format & TEX_FMT_UNNORM) != 0,
+                          UPLOAD_SIZE - (1u << 20), &im, &kept, ld_texpack_ref))
+        return NULL;
+    if (kept) return (ID3D12Resource*)kept;
+    tex_level_t lv[16];
+    for (u32 i = 0; i < im->n; i++) {
+        lv[i].w = im->w[i]; lv[i].h = im->h[i]; lv[i].data = im->data[i];
+        lv[i].row_bytes = im->w[i] * 4u; lv[i].rows = im->h[i];
+    }
+    ID3D12Resource* r = create_texture_mipped(DXGI_FORMAT_R8G8B8A8_UNORM, lv, im->n);
+    if (r) rsx_texpack_keep(hash, t->width, t->height, n_mips, r);
+    return r;
+}
+
 static ID3D12Resource* decode_guest_texture(const rsx_dsp_texture* t, u32 remap)
 {
     const u32 base_fmt = t->format & TEX_FMT_BASE_MASK & ~(u32)TEX_FMT_UNNORM;
@@ -5246,6 +5274,17 @@ static ID3D12Resource* decode_guest_texture(const rsx_dsp_texture* t, u32 remap)
         const u32 total = texture_source_span(t);
         const u8* src = guest_ptr(t->location, t->offset, total);
         if (!src) return NULL;
+        if (rsx_texpack_enabled()) {   /* LD_TEX_DUMP / LD_TEX_PACK (rsx_texpack.c) */
+            if (t->cubemap) rsx_texpack_skip_note("cube map", base_fmt);
+            else {
+                const u32 bw = (w + 3) / 4, bh = (h + 3) / 4;
+                const u64 tp_hash = rsx_texpack_hash(src, bw * block, bh, bw * block, base_fmt, w, h, 0);
+                ID3D12Resource* r = ld_texpack_upload(tp_hash, t, n_mips);
+                if (r) return r;
+                rsx_texpack_dump(tp_hash, base_fmt == TEX_FMT_DXT1 ? 1 : base_fmt == TEX_FMT_DXT23 ? 2 : 3,
+                                 src, w, h, t->location, t->offset, g_ld_frames);
+            }
+        }
         if (t->cubemap) {
             n_mips = 1;
             for (u32 d = (w < h ? w : h) / 4; d > 1; d >>= 1)
@@ -5377,6 +5416,19 @@ static ID3D12Resource* decode_guest_texture(const rsx_dsp_texture* t, u32 remap)
     const u32 span = texture_source_span(t);
     const u8* src = guest_ptr(t->location, t->offset, span);
     if (!src) return NULL;
+    u64 tp_hash = 0; int tp_dump = 0;   /* LD_TEX_DUMP / LD_TEX_PACK (rsx_texpack.c) */
+    if (rsx_texpack_enabled()) {
+        if (t->cubemap) rsx_texpack_skip_note("cube map", base_fmt);
+        else if (texel_size == 8u || base_fmt == TEX_FMT_X16 || base_fmt == TEX_FMT_DEPTH24_D8)
+            rsx_texpack_skip_note("float, 16-bit or depth format", base_fmt);
+        else {
+            tp_hash = rsx_texpack_hash(src, w * texel_size, h, linear && t->pitch ? t->pitch : w * texel_size,
+                                       base_fmt, w, h, remap);
+            ID3D12Resource* r = ld_texpack_upload(tp_hash, t, n_mips);
+            if (r) return r;
+            tp_dump = rsx_texpack_dump_on();
+        }
+    }
 
     if (t->cubemap) {
         u32 available_mips = 1;
@@ -5479,6 +5531,8 @@ static ID3D12Resource* decode_guest_texture(const rsx_dsp_texture* t, u32 remap)
                 decode_texel(base_fmt, pixel, remap,
                              rgba[n] + ((size_t)y * mw + x) * 4);
             }
+        if (tp_dump && m == 0)   /* LD_TEX_DUMP: the decoded top level */
+            rsx_texpack_dump(tp_hash, 0, rgba[n], mw, mh, t->location, t->offset, g_ld_frames);
         /* LD_TEXRGBA_DUMP=1: the DECODED level-0 RGBA, with a non-black count
          * and the remap that produced it.
          *
@@ -5610,6 +5664,11 @@ static void write_texture_srv(u32 index, const texcache_t* entry)
         desc.Format = base_fmt == TEX_FMT_DXT1 ? DXGI_FORMAT_BC1_UNORM
                     : base_fmt == TEX_FMT_DXT23 ? DXGI_FORMAT_BC2_UNORM
                                                 : DXGI_FORMAT_BC3_UNORM;
+        if (rsx_texpack_pack_on()) {   /* LD_TEX_PACK: an RGBA8 replacement keeps the remap */
+            D3D12_RESOURCE_DESC rdsc;
+            entry->tex->lpVtbl->GetDesc(entry->tex, &rdsc);
+            if (rdsc.Format == DXGI_FORMAT_R8G8B8A8_UNORM) desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        }
         desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         desc.Shader4ComponentMapping = mapping[0] | (mapping[1] << 3) |
                                        (mapping[2] << 6) | (mapping[3] << 9) |
@@ -16905,6 +16964,61 @@ static ID3D12PipelineState* get_pso_full(   /* get_pso (LD_PSO_SAME) below */
         snprintf(fn, sizeof fn, "%s/hlsl_%016llx.ps.txt", hd, (unsigned long long)live_legacy_pso_key());
         f = fopen(fn, "wb"); if (f) { fputs(fi > 0 ? ps_hlsl : "<fp fail>", f); fclose(f); }
       } }
+    /* LD_HLSL_REPLACE=<dir> (shader mods, 2026-11-15): a pipeline whose generated pixel (vertex) HLSL has
+     * the FNV-1a 64 hash H uses <dir>\ps_H.hlsl (vs_H.hlsl) instead, when that file exists. LD_HLSL_DUMP
+     * also writes the generated text under those names, so: dump, copy one file into the folder, edit it,
+     * play. The shader and pipeline caches are keyed by the text, so an edited file is compiled anew. A
+     * file that does not compile leaves that pipeline unbuilt (the [pso-fail] log line names it). With
+     * the ubershader on, the stand-in drawn while the pipeline builds is the original program. */
+    { static int rinit; static u64 rset[4096]; static u32 rn; static char rdir[MAX_PATH];
+      const char* hd = getenv("LD_HLSL_DUMP");
+      if (!rinit) {
+          rinit = 1;
+          const char* e = getenv("LD_HLSL_REPLACE");
+          if (e && *e) {
+              snprintf(rdir, sizeof rdir, "%s", e);
+              char pat[MAX_PATH]; WIN32_FIND_DATAA fd;
+              snprintf(pat, sizeof pat, "%s\*.hlsl", rdir);
+              HANDLE fh = FindFirstFileA(pat, &fd);
+              if (fh != INVALID_HANDLE_VALUE) {
+                  do {   /* ps_<16 hex>.hlsl / vs_<16 hex>.hlsl; the kind is kept in the low bit */
+                      const char* n = fd.cFileName;
+                      if (rn < 4096u && strlen(n) == 24 && (n[0] == 'p' || n[0] == 'v') && n[1] == 's' && n[2] == '_' &&
+                          _stricmp(n + 19, ".hlsl") == 0) {
+                          char hx[17]; memcpy(hx, n + 3, 16); hx[16] = 0;
+                          rset[rn++] = (_strtoui64(hx, NULL, 16) & ~1ull) | (n[0] == 'p' ? 1ull : 0ull);
+                      }
+                  } while (FindNextFileA(fh, &fd));
+                  FindClose(fh);
+              }
+              fprintf(stderr, "[hlsl-replace] %u shader file(s) in %s%c", rn, rdir, 10);
+          }
+      }
+      for (int k = 0; k < 2; k++) {
+          char* txt = k ? ps_hlsl : vs_hlsl;
+          if ((k ? fi : vi) <= 0) continue;
+          const u64 h = fnv1a(txt, (u32)strlen(txt), 1469598103934665603ull);
+          if (hd) {   /* LD_HLSL_DUMP: the names LD_HLSL_REPLACE looks for */
+              char fn[MAX_PATH];
+              snprintf(fn, sizeof fn, "%s/%s_%016llx.hlsl", hd, k ? "ps" : "vs", (unsigned long long)h);
+              FILE* f = fopen(fn, "rb");
+              if (f) fclose(f);
+              else if ((f = fopen(fn, "wb")) != NULL) { fputs(txt, f); fclose(f); }
+          }
+          if (!rn) continue;
+          const u64 want = (h & ~1ull) | (u64)k;
+          u32 j = 0;
+          while (j < rn && rset[j] != want) j++;
+          if (j == rn) continue;
+          char fn[MAX_PATH];
+          snprintf(fn, sizeof fn, "%s\%s_%016llx.hlsl", rdir, k ? "ps" : "vs", (unsigned long long)h);
+          FILE* f = fopen(fn, "rb");
+          if (!f) continue;
+          const size_t got = fread(txt, 1, sizeof(ps_hlsl) - 1, f);
+          fclose(f);
+          txt[got] = 0;
+          fprintf(stderr, "[hlsl-replace] %s_%016llx.hlsl used (%u bytes)%c", k ? "ps" : "vs", (unsigned long long)h, (unsigned)got, 10);
+      } }
     /* LD_PSO_ASYNC: what the caches hold now, else a worker builds it. The
      * entry is complete before the job is queued: the worker writes its pso. */
     const u32 slot = g.n_psos;
@@ -23553,6 +23667,7 @@ static void sink_end_impl(void* user, const rsx_dispatch* r)
       } }
     ld_zprobe(prim, n_tri, current_zslot, &sf, &vp, target);
     if (s_fsr3.on || s_fsr3.scale_on) ld_fsr3_scene_draw(target, current_zslot, &sf, &vp);   /* FSR3_FG / _SCALE: scene depth + camera */
+    if (!g_ld_oc_in_draw) ld_ao_draw(target, current_zslot, &vp);   /* LD_AO (rsx_ao.inc) */
     u32 slots[SRV_TABLE_SIZE], smp_slots[SMP_TABLE_SIZE];
     u32 surf_used[SRV_TABLE_SIZE], n_surf_used = 0;
     u32 zdepth_used[SRV_TABLE_SIZE], n_zdepth_used = 0;
@@ -26779,6 +26894,8 @@ static void ld_hole_draw(u32 target, const u32* mrt, u32 n_mrt)
                   s_hole.n - 1, g_ld_frames); }
 }
 
+#include "rsx_ao.inc"   /* LD_AO: ambient occlusion at the end of the scene's EQUAL pass (2026-11-15) */
+
 /* LD_SMAA=1: SMAA 1x (luma edges, preset HIGH) on the presented frame. */
 static int ld_smaa_enabled(void)
 {
@@ -27085,7 +27202,7 @@ static ID3D12PipelineState* ld_rcas_pso(void)
 #endif
 #pragma comment(lib, "gdi32.lib")
 #define SRV_CREDIT (SRV_PP_BASE + LD_PP_N + 1)
-typedef char ld_credit_slot_fits[(LD_PP_N + 1 < 16) ? 1 : -1];   /* inside SRV_CPU_HEAP_SLOTS */
+typedef char ld_credit_slot_fits[(LD_PP_N + 1 < 20) ? 1 : -1];   /* inside SRV_CPU_HEAP_SLOTS */
 static struct {
     int state;                          /* 0 not started, 1 on, -1 off or failed */
     ID3D12PipelineState* pso;           /* the copy shaders with a premultiplied blend */

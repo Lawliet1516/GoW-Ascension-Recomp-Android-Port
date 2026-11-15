@@ -157,6 +157,14 @@ static mutex_t       s_audio_mutex;
 
 /* Output mix buffer (stereo, one block worth) */
 static float s_mix_buffer[CELL_AUDIO_BLOCK_SAMPLES * 2];
+/* SURROUND (2026-11-15): the game configures 5.1 (AudioOutConfigure channel=6) and writes its 8-channel
+ * port in the PS3 order L R C LFE Ls Rs Lb Rb, but every block was folded down to stereo, so a 5.1/7.1
+ * speaker setup played nothing on its surround speakers (players, 2026-11-15). When Windows' default
+ * device is set to 6 or more channels, the output is now a 5.1 stream (L R C LFE Ls Rs; the two extra
+ * channels folded into Ls/Rs; Windows maps it onto 7.1). AUDIO_SURROUND=0: stereo as before;
+ * =1: 5.1 even on a stereo device (Windows folds it down; for tests). AUDIO_OUT_CH=2 keeps stereo. */
+static float s_mix_mc[CELL_AUDIO_BLOCK_SAMPLES * 6];
+static u32   s_out_ch = 2;
 
 /* ---------------------------------------------------------------------------
  * Audio health (2026-11-07, AUDIO-NOTES.md). One "[audio]" line per 5 s, ON by
@@ -483,14 +491,47 @@ static int audio_backend_init(void)
 #ifndef AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
 #define AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY 0x08000000
 #endif
+    unsigned mix_ch = 2; DWORD mix_mask = 0;
     { WAVEFORMATEX* mix = NULL;
       if (SUCCEEDED(s_wasapi_client->lpVtbl->GetMixFormat(s_wasapi_client, &mix)) && mix) {
           printf("[cellAudio] device mix format: %lu Hz, %u channels, %u bits (tag 0x%X)\n",
                  (unsigned long)mix->nSamplesPerSec, mix->nChannels, mix->wBitsPerSample, mix->wFormatTag);
+          mix_ch = mix->nChannels;
+          if (mix->wFormatTag == 0xFFFEu && mix->cbSize >= 22)
+              memcpy(&mix_mask, (const BYTE*)mix + 20, 4);   /* WAVEFORMATEXTENSIBLE.dwChannelMask */
           CoTaskMemFree(mix);
       } }
     const DWORD convert = AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
 
+    /* SURROUND: a 5.1 float stream when the device has 6+ channels (see s_mix_mc) */
+    s_out_ch = 2;
+    { const char* e = getenv("AUDIO_SURROUND"); const char* o = getenv("AUDIO_OUT_CH");
+      int want = (e && *e == '0') || (o && atoi(o) == 2) ? 0 : (e && *e == '1') ? 1 : mix_ch >= 6;
+      if (want) {
+#pragma pack(push, 1)
+          struct { WAVEFORMATEX f; WORD valid; DWORD mask; GUID sub; } x;
+#pragma pack(pop)
+          static const GUID float_sub = { 0x00000003, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+          memset(&x, 0, sizeof x);
+          x.f.wFormatTag = 0xFFFEu;   /* WAVE_FORMAT_EXTENSIBLE */
+          x.f.nChannels = 6; x.f.nSamplesPerSec = CELL_AUDIO_SAMPLE_RATE; x.f.wBitsPerSample = 32;
+          x.f.nBlockAlign = 6 * 4; x.f.nAvgBytesPerSec = x.f.nSamplesPerSec * x.f.nBlockAlign;
+          x.f.cbSize = 22; x.valid = 32;
+          x.mask = mix_ch == 6 && mix_mask ? mix_mask : 0x60Fu;   /* the device's own 5.1 layout, else FL FR FC LFE SL SR */
+          x.sub = float_sub;
+          hr = s_wasapi_client->lpVtbl->Initialize(s_wasapi_client, AUDCLNT_SHAREMODE_SHARED,
+                  AUDCLNT_STREAMFLAGS_EVENTCALLBACK | convert, buf_duration, 0, &x.f, NULL);
+          if (SUCCEEDED(hr)) {
+              s_out_ch = 6;
+              printf("[cellAudio] output: 5.1 surround (6 channels, mask 0x%lX; device %u channels; AUDIO_SURROUND=0: stereo)%c",
+                     (unsigned long)x.mask, mix_ch, 10);
+          } else
+              printf("[cellAudio] 5.1 stream refused (0x%08lX): stereo%c", (unsigned long)hr, 10);
+      } else
+          printf("[cellAudio] output: stereo (device %u channels)%c", mix_ch, 10);
+    }
+
+    if (s_out_ch == 2)
     hr = s_wasapi_client->lpVtbl->Initialize(
         s_wasapi_client,
         AUDCLNT_SHAREMODE_SHARED,
@@ -579,7 +620,16 @@ static void audio_backend_submit(const float* stereo_samples, u32 num_samples)
          * timing exactly as an audible one. */
         static int mute = -1;
         if (mute < 0) { const char* e = getenv("AUDIO_MUTE"); mute = e && *e == '1'; }
-        if (!mute) memcpy(buf, stereo_samples, num_samples * 2 * sizeof(float));
+        if (mute) { }
+        else if (s_out_ch == 6 && stereo_samples == s_mix_buffer)   /* SURROUND: the mixed 5.1 block */
+            memcpy(buf, s_mix_mc, num_samples * 6 * sizeof(float));
+        else if (s_out_ch == 6) {   /* a stereo fill (AUDIO_ELASTIC): on the front pair */
+            float* o = (float*)buf;
+            for (u32 i = 0; i < num_samples; i++) {
+                o[i * 6 + 0] = stereo_samples[i * 2]; o[i * 6 + 1] = stereo_samples[i * 2 + 1];
+                o[i * 6 + 2] = o[i * 6 + 3] = o[i * 6 + 4] = o[i * 6 + 5] = 0.0f;
+            }
+        } else memcpy(buf, stereo_samples, num_samples * 2 * sizeof(float));
         s_wasapi_render->lpVtbl->ReleaseBuffer(s_wasapi_render, num_samples,
                                                mute ? 0x2u /* AUDCLNT_BUFFERFLAGS_SILENT */ : 0);
     }
@@ -645,6 +695,7 @@ static inline float ld_be_f32(const float* p)
 static void audio_mix_one_block(void)
 {
     memset(s_mix_buffer, 0, sizeof(s_mix_buffer));
+    if (s_out_ch == 6) memset(s_mix_mc, 0, sizeof(s_mix_mc));
 
     mutex_lock(&s_audio_mutex);
 
@@ -791,6 +842,21 @@ static void audio_mix_one_block(void)
                 left *= s_headroom; right *= s_headroom;
             }
             if (el_fade && s < 128) { const float g = (float)(s + 1) / 128.0f; left *= g; right *= g; }
+            if (s_out_ch == 6) {   /* SURROUND: the port's channels as they are */
+                float* m = &s_mix_mc[s * 6];
+                const float g = level * (el_fade && s < 128 ? (float)(s + 1) / 128.0f : 1.0f);
+                if (nch >= 6) {
+                    for (u32 c = 0; c < 6; c++) m[c] += ld_be_f32(&src[s * nch + c]) * g;
+                    if (nch >= 8) {
+                        m[4] += ld_be_f32(&src[s * nch + 6]) * g * 0.707f;
+                        m[5] += ld_be_f32(&src[s * nch + 7]) * g * 0.707f;
+                    }
+                } else if (nch >= 2) {
+                    m[0] += ld_be_f32(&src[s * nch + 0]) * g; m[1] += ld_be_f32(&src[s * nch + 1]) * g;
+                } else {
+                    const float v = ld_be_f32(&src[s]) * g; m[0] += v; m[1] += v;
+                }
+            }
 
             s_mix_buffer[s * 2 + 0] += left;
             s_mix_buffer[s * 2 + 1] += right;
@@ -846,6 +912,11 @@ static void audio_mix_one_block(void)
         s_lim_gain = g;
     }
 
+    if (s_out_ch == 6)   /* SURROUND: clip the 5.1 block too */
+        for (u32 i = 0; i < CELL_AUDIO_BLOCK_SAMPLES * 6; i++) {
+            if (s_mix_mc[i] > 1.0f) s_mix_mc[i] = 1.0f;
+            if (s_mix_mc[i] < -1.0f) s_mix_mc[i] = -1.0f;
+        }
     /* Clip to [-1.0, 1.0] */
     for (u32 i = 0; i < CELL_AUDIO_BLOCK_SAMPLES * 2; i++) {
         if (s_mix_buffer[i] > 1.0f) s_mix_buffer[i] = 1.0f;
@@ -859,7 +930,10 @@ static void audio_wav_out(const float* b)
 {
     static FILE* _wf = (FILE*)-1;
     if (_wf == (FILE*)-1) { const char* e = getenv("AUDIO_WAV"); _wf = e ? fopen(e, "wb") : NULL; }
-    if (_wf) fwrite(b, sizeof(float), CELL_AUDIO_BLOCK_SAMPLES * 2, _wf);
+    if (_wf) {   /* SURROUND: the 5.1 stream as sent (-ac 6) */
+        if (s_out_ch == 6 && b == s_mix_buffer) fwrite(s_mix_mc, sizeof(float), CELL_AUDIO_BLOCK_SAMPLES * 6, _wf);
+        else fwrite(b, sizeof(float), CELL_AUDIO_BLOCK_SAMPLES * 2, _wf);
+    }
 }
 
 #if defined(_WIN32) && AUDIO_BACKEND_WASAPI
