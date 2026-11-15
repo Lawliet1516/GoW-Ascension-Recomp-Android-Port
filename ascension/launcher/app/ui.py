@@ -18,7 +18,7 @@ from .config import (ANISO_LEVELS, APP_NAME, ASPECTS, CONFIG_FILE, CONTROL_GROUP
     TK_KEYS, VERSION, VOICE_LANGUAGES, VSYNC_MODES, WINDOWS, WINDOW_SIZES, asset, fps_limit, fps_unlocked, key_label,
     load_settings,
     save_settings)
-from .game import (online_on, online_dropped_patches, play_exe, installed_exe, lan_discover, start_lan_server, stop_lan_server, lan_server_running, take_discord_join, all_mods, backup_list, close_gently, disc_info, disc_problem, disc_ps3_game, game_running, icon_file,
+from .game import (online_on, title_id as game_title_id, online_dropped_patches, play_exe, installed_exe, lan_discover, start_lan_server, stop_lan_server, lan_server_running, take_discord_join, all_mods, backup_list, close_gently, disc_info, disc_problem, disc_ps3_game, game_running, icon_file,
     gigabytes, join_check, join_split, language_fallback, language_options, missing, prebuild_mods, prepare_game, release_disc, restore_saves, runtime_switches,
     save_dir, split_game_files, start_game, backup_saves, watch_saves, export_saves, import_saves,
     record_install, lost_save_plan, recover_save, mark_handled, any_game_running)
@@ -233,13 +233,16 @@ class Launcher(Look):
 
         stamp = time.strftime('%Y%m%d-%H%M%S')
         done, kept, answered, errors = [], set(), [], []
-        for it in [p for p in plan if p['auto']] + [p for p in plan if not p['auto']]:
+        # At launcher start only saves missing here are filled in (auto). A save here is never replaced unless
+        # the player asks on the Saves page (2026-11-15: the start-up check put chapter 19 back over chapter 22).
+        offers = [p for p in plan if not p['auto']] if manual else []
+        for it in [p for p in plan if p['auto']] + offers:
             if not it['auto'] and not self.messagebox.askyesno(APP_NAME, tr(
                     'Another story save of this game was found:\n\n{where}\nlast saved {then}\n\nThe save here ({name}) '
-                    'was last saved {now}. If you started the game again after an update, the other one is probably '
-                    'your old progress.\n\nUse the other save? The save here is moved to gamedata\\replaced-saves '
-                    '(nothing is deleted).', where=where(it), then=when(it['newest']), name=it['name'],
-                    now=when(it['here_newest']))):
+                    'was last saved {now}.\n\nThe dates only say when each was saved, not how far each one is in the '
+                    'story. Answer Yes only if you know the other one is further.\n\nUse the other save? The save here '
+                    'is moved to gamedata\\replaced-saves (nothing is deleted).', where=where(it), then=when(it['newest']),
+                    name=it['name'], now=when(it['here_newest'])), default='no'):
                 answered.append(it)
                 continue
             try:
@@ -1373,6 +1376,9 @@ class Launcher(Look):
         self.server_box = self.ttk.Combobox(f, textvariable=self.server_pick, state='readonly', width=46)
         self.server_box.bind('<<ComboboxSelected>>', lambda e: self.online_pick_server())
         self.server_box.bind('<MouseWheel>', lambda e: 'break')
+        self.server_choices = getattr(self, 'server_choices', {})
+        # The picker follows a typed or pasted Server box (2026-11-15: it kept showing an old "Other:" address).
+        self.var('online_server').trace_add('write', lambda *_: self.online_sync_pick())
         self.row(f, tr('Pick a server'), self.server_box,
                  tr('The community servers with your ping to each, nearest first, and the LAN servers on your own '
                     'network. Everyone you play with must use the same server. Refresh measures again.'))
@@ -1509,8 +1515,16 @@ class Launcher(Look):
             self.server_choices[label] = h
             labels.append(label)
         self.server_box.configure(values=labels)
+        self.online_sync_pick()
+
+    def online_sync_pick(self):
+        """Shows in 'Pick a server' the server the Server box names (a listed one, else "Other: <address>")."""
+        if not hasattr(self, 'server_pick'):
+            return
         current = self.server_host(self.var('online_server').get())
-        self.server_pick.set(next((l for l, h in self.server_choices.items() if h == current),
+        if self.server_choices.get(self.server_pick.get()) == current and current:
+            return
+        self.server_pick.set(next((l for l, h in getattr(self, 'server_choices', {}).items() if h == current),
                                   tr('Other: {address}', address=current) if current else ''))
 
     def online_host_lan(self):
@@ -2149,10 +2163,16 @@ class Launcher(Look):
         self.play_button.configure(text=tr('RUNNING'), state='disabled')
         dropped = online_dropped_patches(env)
         if dropped:
-            self.refresh_status(tr('Game running online. Cheats are off online ({n} patches left out; they stay '
-                                   'on for single player).', n=len(dropped)))
+            msg = tr('Game running online. Cheats are off online ({n} patches left out; they stay '
+                     'on for single player).', n=len(dropped))
         else:
-            self.refresh_status(tr('Game running… the log is in Advanced → Log.'))
+            msg = tr('Game running… the log is in Advanced → Log.')
+        if online_on(self.s) and game_title_id(self.s) == GAME_ID:
+            # 2026-11-15 STATIC: the EU and US discs carry different multiplayer data (maps, object ID order),
+            # so the game puts it in the matchmaking key and never plays an EU-disc player with a US-disc player
+            msg += ' ' + tr('European disc: online you only meet players with the European disc (US-disc players '
+                            'have different multiplayer data).')
+        self.refresh_status(msg)
         if WINDOWS and not self.embedded and self.s.get('hide_while_playing') == '1':
             self.root.after(4000, self.hide_for_game, self.process)
         threading.Thread(target=self.wait_game, daemon=True).start()

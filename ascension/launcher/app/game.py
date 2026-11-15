@@ -5,6 +5,7 @@ import re
 import os
 import shutil
 import struct
+import stat
 import subprocess
 import threading
 import time
@@ -1060,6 +1061,7 @@ def import_saves(zip_path):
         shutil.rmtree(tmp, ignore_errors=True)
         tmp.mkdir(parents=True)
         z.extractall(tmp)
+    make_writable(tmp)
     if dst.is_dir():
         backup_saves()
         for d in dst.iterdir():                     # keep anything that is not a game save folder
@@ -1076,6 +1078,19 @@ def backup_list():
     return sorted((d for d in folder.iterdir() if d.is_dir()), reverse=True) if folder.is_dir() else []
 
 
+def make_writable(folder):
+    """Clear the read-only flag on every file under `folder`: copy2/copytree carry it over, and the game
+    cannot write a read-only save file (its save then fails without a word)."""
+    for dirpath, _dirs, files in os.walk(folder):
+        for name in files:
+            p = os.path.join(dirpath, name)
+            try:
+                if not os.access(p, os.W_OK):
+                    os.chmod(p, stat.S_IREAD | stat.S_IWRITE)
+            except OSError:
+                pass
+
+
 def restore_saves(backup):
     """The saves as they were in `backup`. The current ones are backed up
     first; the copy is taken before that, since it can drop the oldest."""
@@ -1083,6 +1098,7 @@ def restore_saves(backup):
     tmp = dst.with_name('savedata.restoring')
     shutil.rmtree(tmp, ignore_errors=True)
     shutil.copytree(backup, tmp)
+    make_writable(tmp)
     backup_saves()
     shutil.rmtree(dst, ignore_errors=True)
     tmp.rename(dst)
@@ -1288,12 +1304,17 @@ def lost_save_plan(s, ignore_handled=False):
         key = f'{where}|{name}|{int(newest)}'
         if key in handled:
             continue
+        # auto (copied without asking) ONLY when there is no save here. A file time says when a save was
+        # written, not how far the story is: one checkpoint in an old install (ch19) made its files newer
+        # than this install's ch22, and every next launcher start copied ch19 over ch22 without asking
+        # (players, 2026-11-15: "I always return to chapter 19"). A save here is only replaced when the
+        # player picks the other one on the Saves page (check_lost_saves(manual=True)).
         if not here_has:
             auto = True
         elif name.endswith('-SYSDATA'):
             continue                                        # a system save here is never replaced
         else:
-            auto = newest > here_newest + NEWER_S
+            auto = False
         install = Path(where).parents[6] if len(Path(where).parents) > 6 else Path(where)   # the release folder
         plan.append({'name': name, 'files': files, 'newest': newest, 'where': str(install), 'loose': loose,
                      'here_newest': here_newest, 'auto': auto, 'key': key})
@@ -1331,6 +1352,7 @@ def recover_save(item, stamp=None):
         if f.name == 'PARAM.SFO' and item['loose'] and (tmp / 'PARAM.SFO').is_file():
             continue                                        # keep the folder's own
         shutil.copy2(f, tmp / f.name)
+    make_writable(tmp)
     if item['loose']:
         # PARAM.PFD: the runtime's list of the files written as secure files (cellSaveData.c pfd_add)
         pfd = tmp / 'PARAM.PFD'

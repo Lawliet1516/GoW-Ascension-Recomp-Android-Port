@@ -546,7 +546,7 @@
   "Clearer messages for unsupported PCs": "Mensagens mais claras para PCs não compatíveis",
   "Could not look for saves:\n{error}": "Não foi possível procurar os saves:\n{error}",
   "{folder} (checkpoints that version 0.1.26 or older saved in the wrong folder)": "{folder} (checkpoints que a versão 0.1.26 ou anterior salvou na pasta errada)",
-  "Another story save of this game was found:\n\n{where}\nlast saved {then}\n\nThe save here ({name}) was last saved {now}. If you started the game again after an update, the other one is probably your old progress.\n\nUse the other save? The save here is moved to gamedata\\replaced-saves (nothing is deleted).": "Outro save da história deste jogo foi encontrado:\n\n{where}\nsalvo pela última vez em {then}\n\nO save daqui ({name}) foi salvo pela última vez em {now}. Se você começou o jogo de novo depois de uma atualização, o outro provavelmente é o seu progresso antigo.\n\nUsar o outro save? O save daqui vai para gamedata\\replaced-saves (nada é apagado).",
+  "Another story save of this game was found:\n\n{where}\nlast saved {then}\n\nThe save here ({name}) was last saved {now}.\n\nThe dates only say when each was saved, not how far each one is in the story. Answer Yes only if you know the other one is further.\n\nUse the other save? The save here is moved to gamedata\\replaced-saves (nothing is deleted).": "Outro save da história deste jogo foi encontrado:\n\n{where}\nsalvo pela última vez em {then}\n\nO save daqui ({name}) foi salvo pela última vez em {now}.\n\nAs datas só dizem quando cada um foi salvo, não o quanto cada um avançou na história. Responda Sim só se você sabe que o outro está mais adiantado.\n\nUsar o outro save? O save daqui vai para gamedata\\replaced-saves (nada é apagado).",
   "• {name} from {where} (last saved {then})": "• {name} de {where} (salvo em {then})",
   "Your saves were recovered:\n\n{lines}": "Seus saves foram recuperados:\n\n{lines}",
   "The saves they replaced are kept in {folder}.": "Os saves substituídos ficam guardados em {folder}.",
@@ -565,5 +565,7 @@
   "Ambient occlusion": "Oclusão de ambiente",
   "Adds soft contact shadows in corners, under ledges and where characters stand. Not part of the PS3 game. Uses some GPU time; turn it off if something looks wrong.": "Adiciona sombras de contato suaves em cantos, sob saliências e onde os personagens pisam. Não faz parte do jogo de PS3. Usa um pouco de GPU; desligue se algo parecer errado.",
   "Online: cheats are left out automatically": "Online: trapaças ficam de fora automaticamente",
-  "Game running online. Cheats are off online ({n} patches left out; they stay on for single player).": "Jogo online. As trapaças ficam desligadas online ({n} patches deixados de fora; continuam ligados no modo um jogador)."
+  "Game running online. Cheats are off online ({n} patches left out; they stay on for single player).": "Jogo online. As trapaças ficam desligadas online ({n} patches deixados de fora; continuam ligados no modo um jogador).",
+  "European disc: online you only meet players with the European disc (US-disc players have different multiplayer data).": "Disco europeu: online você só encontra jogadores com o disco europeu (quem usa o disco dos EUA tem outros dados multijogador).",
+  "Saves: an older save no longer replaces your progress": "Saves: um save mais antigo não substitui mais o seu progresso"
 }

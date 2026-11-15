@@ -546,7 +546,7 @@
   "Clearer messages for unsupported PCs": "Mensajes más claros para PC no compatibles",
   "Could not look for saves:\n{error}": "No se pudieron buscar las partidas:\n{error}",
   "{folder} (checkpoints that version 0.1.26 or older saved in the wrong folder)": "{folder} (puntos de control que la versión 0.1.26 o anterior guardó en la carpeta equivocada)",
-  "Another story save of this game was found:\n\n{where}\nlast saved {then}\n\nThe save here ({name}) was last saved {now}. If you started the game again after an update, the other one is probably your old progress.\n\nUse the other save? The save here is moved to gamedata\\replaced-saves (nothing is deleted).": "Se encontró otra partida de la historia de este juego:\n\n{where}\nguardada por última vez el {then}\n\nLa partida de aquí ({name}) se guardó por última vez el {now}. Si empezaste el juego de nuevo tras una actualización, la otra probablemente es tu progreso anterior.\n\n¿Usar la otra partida? La de aquí se mueve a gamedata\\replaced-saves (no se borra nada).",
+  "Another story save of this game was found:\n\n{where}\nlast saved {then}\n\nThe save here ({name}) was last saved {now}.\n\nThe dates only say when each was saved, not how far each one is in the story. Answer Yes only if you know the other one is further.\n\nUse the other save? The save here is moved to gamedata\\replaced-saves (nothing is deleted).": "Se encontró otra partida de la historia de este juego:\n\n{where}\nguardada por última vez el {then}\n\nLa partida de aquí ({name}) se guardó por última vez el {now}.\n\nLas fechas solo dicen cuándo se guardó cada una, no lo avanzada que está en la historia. Responde Sí solo si sabes que la otra está más avanzada.\n\n¿Usar la otra partida? La de aquí se mueve a gamedata\\replaced-saves (no se borra nada).",
   "• {name} from {where} (last saved {then})": "• {name} de {where} (guardada el {then})",
   "Your saves were recovered:\n\n{lines}": "Se recuperaron tus partidas:\n\n{lines}",
   "The saves they replaced are kept in {folder}.": "Las partidas que reemplazaron se guardan en {folder}.",
@@ -565,5 +565,7 @@
   "Ambient occlusion": "Oclusión ambiental",
   "Adds soft contact shadows in corners, under ledges and where characters stand. Not part of the PS3 game. Uses some GPU time; turn it off if something looks wrong.": "Añade sombras de contacto suaves en esquinas, bajo salientes y donde se apoyan los personajes. No forma parte del juego de PS3. Usa algo de GPU; desactívala si algo se ve mal.",
   "Online: cheats are left out automatically": "En línea: los trucos se quitan automáticamente",
-  "Game running online. Cheats are off online ({n} patches left out; they stay on for single player).": "Juego en línea. Los trucos están desactivados en línea ({n} parches quitados; siguen activos en un jugador)."
+  "Game running online. Cheats are off online ({n} patches left out; they stay on for single player).": "Juego en línea. Los trucos están desactivados en línea ({n} parches quitados; siguen activos en un jugador).",
+  "European disc: online you only meet players with the European disc (US-disc players have different multiplayer data).": "Disco europeo: en línea solo juegas con jugadores del disco europeo (los del disco de EE. UU. tienen otros datos multijugador).",
+  "Saves: an older save no longer replaces your progress": "Partidas: una partida más antigua ya no reemplaza tu progreso"
 }

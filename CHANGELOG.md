@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.34 (beta), 2026-11-16
+
+### Saves: an older save no longer replaces your progress
+Since 0.1.30 the launcher could copy a save from another install of the game (an older version folder) over
+yours, without asking, whenever that save had a newer file date. One checkpoint in an old install was enough:
+on the next launcher start your chapter 22 went back to chapter 19, and again after every play there.
+Now the launcher only fills in a save when there is none here. It never replaces an existing save at start-up.
+The Saves page's "Find lost saves" button still offers the other save, says that dates are not story progress,
+and its default answer is No. Restored or imported saves are no longer left read-only.
+
+**Lost progress?** It was not deleted. The replaced save is in `gamedata\replaced-saves\<date-time>\`:
+close the game and copy that save folder back into `gamedata\dev_hdd0\home\00000001\savedata\`.
+Older copies are in the launcher's Saves page (Restore picks one of the backups).
+
+### Online
+- The "Pick a server" list now follows the address in the Server box (it could show an old "Other:" address).
+- European-disc players see a note that online they only meet other European-disc players (the two discs carry
+  different multiplayer data).
+
+### Saves: the right save date
+The save date in the game (and in Explorer) stayed at the first save's date, or showed 1970: Windows does not move a
+folder's date when the files in it are overwritten, and the game only got the folder's date. The game now gets the
+newest save file's date, and each save also sets the folder's date.
+
+- Game exe: 0.1.32 + the save-date fix.
+
 ## 0.1.33 (beta), 2026-11-15
 
 ### Online: cheats no longer block online play

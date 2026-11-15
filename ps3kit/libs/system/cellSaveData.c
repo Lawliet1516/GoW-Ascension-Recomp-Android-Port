@@ -560,6 +560,75 @@ static u32 savedata_file_type(const char* save_path, const char* name)
          ? CELL_SAVEDATA_FILETYPE_SECUREFILE : t;
 }
 
+#ifdef _WIN32
+/* FILETIME (100 ns since 1601) -> Unix seconds; 0 for a zero or pre-1970 time. */
+static s64 savedata_filetime_unix(const FILETIME* ft)
+{
+    ULARGE_INTEGER u;
+    u.LowPart = ft->dwLowDateTime;
+    u.HighPart = ft->dwHighDateTime;
+    if (u.QuadPart < 116444736000000000ULL) return 0;
+    return (s64)((u.QuadPart - 116444736000000000ULL) / 10000000ULL);
+}
+#endif
+
+/* Save dates (2026-11-16, players saw wrong or 1970 dates): the game shows the save folder's
+ * time, but NTFS (and POSIX) do not move a folder's time when a file in it is overwritten, so
+ * every checkpoint after the first kept the first one's date. The folder time handed to the
+ * game is therefore the newer of the folder's own time and its newest file's time. */
+static s64 savedata_newest_file_mtime(const char* save_path)
+{
+    s64 newest = 0;
+#ifdef _WIN32
+    char search[1024];
+    snprintf(search, sizeof(search), "%s\\*", save_path);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(search, &fd);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        s64 t = savedata_filetime_unix(&fd.ftLastWriteTime);
+        if (t > newest) newest = t;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+#else
+    DIR* dp = opendir(save_path);
+    if (!dp) return 0;
+    struct dirent* de;
+    while ((de = readdir(dp)) != NULL) {
+        if (de->d_name[0] == '.') continue;
+        char full[1024];
+        snprintf(full, sizeof(full), "%s/%s", save_path, de->d_name);
+        HOST_STAT_T st;
+        if (HOST_STAT(full, &st) != 0 || S_ISDIR(st.st_mode)) continue;
+#if defined(__APPLE__)
+        s64 t = (s64)st.st_mtimespec.tv_sec;
+#else
+        s64 t = (s64)st.st_mtim.tv_sec;
+#endif
+        if (t > newest) newest = t;
+    }
+    closedir(dp);
+#endif
+    return newest;
+}
+
+/* After a save: give the folder the current time too (Explorer and older builds read it). */
+static void savedata_touch_dir(const char* save_path)
+{
+#ifdef _WIN32
+    HANDLE h = CreateFileA(save_path, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (h == INVALID_HANDLE_VALUE) return;
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    SetFileTime(h, NULL, NULL, &now);
+    CloseHandle(h);
+#else
+    (void)save_path;     /* the newest-file rule above covers the date the game sees */
+#endif
+}
+
 /* Enumerate files in a save directory. Returns count, fills fileList up to max. */
 static u32 enumerate_save_files(const char* save_path,
                                  CellSaveDataFileStat* fileList, u32 max)
@@ -587,6 +656,10 @@ static u32 enumerate_save_files(const char* save_path,
                 sz.HighPart = fd.nFileSizeHigh;
                 sz.LowPart  = fd.nFileSizeLow;
                 fileList[count].st_size = (u64)sz.QuadPart;
+                /* 2026-11-16: the file times were left 0 here (the game showed 1970 as the save date). */
+                fileList[count].st_atime = savedata_filetime_unix(&fd.ftLastAccessTime);
+                fileList[count].st_mtime = savedata_filetime_unix(&fd.ftLastWriteTime);
+                fileList[count].st_ctime = savedata_filetime_unix(&fd.ftCreationTime);
             }
             count++;
         } while (FindNextFileA(hFind, &fd));
@@ -890,6 +963,12 @@ static s32 savedata_execute(const char* dirName, int is_save,
             statGet.dir.st_ctime = (s64)hst.st_ctim.tv_sec;
 #endif
         }
+        {
+            s64 newest = savedata_newest_file_mtime(save_path), folder = statGet.dir.st_mtime;
+            if (newest > statGet.dir.st_mtime) statGet.dir.st_mtime = newest;
+            printf("[cellSaveData] date for '%s': folder %lld, newest file %lld -> %lld\n", dirName,
+                   (long long)folder, (long long)newest, (long long)statGet.dir.st_mtime);
+        }
         read_param_sfo(save_path, &statGet.getParam);
     }
 
@@ -960,6 +1039,8 @@ static s32 savedata_execute(const char* dirName, int is_save,
         return CELL_SAVEDATA_ERROR_CBRESULT;
     }
 
+    if (is_save)
+        savedata_touch_dir(save_path);
     printf("[cellSaveData] %s complete for '%s'\n",
            is_save ? "SAVE" : "LOAD", dirName);
     return CELL_OK;
