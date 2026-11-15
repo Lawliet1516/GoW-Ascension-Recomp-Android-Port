@@ -692,6 +692,29 @@ def online_environment(s, env):
         env.pop('PS3_MPNET_PARTY', None)
     env.pop('PS3_MODS', None)
     env['PS3_MPNET_TOKEN_FILE'] = str(token_file())
+    # Fair play (2026-11-15): the game turns online off when any non-visual patch is on and then only shows the
+    # stock "signed out of PlayStation Network" screen. So an online run leaves cheats and other gameplay patches
+    # out (they stay ticked for single player) and the launcher says so.
+    env.pop(ONLINE_DROPPED_KEY, None)
+    if env.get('PS3_PATCHES') and env['PS3_PATCHES'] != 'none':
+        names = [n.strip() for n in env['PS3_PATCHES'].split('|') if n.strip()]
+        keep = [n for n in names if n in ONLINE_FAIR_PATCHES]
+        dropped = [n for n in names if n not in ONLINE_FAIR_PATCHES]
+        if dropped:
+            env['PS3_PATCHES'] = '|'.join(keep) or 'none'
+            env[ONLINE_DROPPED_KEY] = '|'.join(dropped)
+
+
+# The patches the game allows online (kit libs/network/mpnet.c, list `fair`): keep the two lists the same.
+ONLINE_FAIR_PATCHES = ('Unlock FPS', 'Disable Depth of Field', 'Disable Motion Blur', 'Disable MLAA',
+                       'Disable SPU MLAA - God of War: Ascension (01)')
+ONLINE_DROPPED_KEY = 'PS3_LAUNCHER_ONLINE_DROPPED'   # read by the launcher only (the status line)
+
+
+def online_dropped_patches(env):
+    """The patches an online run left out (online_environment), for the launcher's message."""
+    v = env.get(ONLINE_DROPPED_KEY, '')
+    return [n for n in v.split('|') if n]
 
 
 def token_file():

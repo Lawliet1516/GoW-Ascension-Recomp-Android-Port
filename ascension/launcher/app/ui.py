@@ -18,7 +18,7 @@ from .config import (ANISO_LEVELS, APP_NAME, ASPECTS, CONFIG_FILE, CONTROL_GROUP
     TK_KEYS, VERSION, VOICE_LANGUAGES, VSYNC_MODES, WINDOWS, WINDOW_SIZES, asset, fps_limit, fps_unlocked, key_label,
     load_settings,
     save_settings)
-from .game import (online_on, play_exe, installed_exe, lan_discover, start_lan_server, stop_lan_server, lan_server_running, take_discord_join, all_mods, backup_list, close_gently, disc_info, disc_problem, disc_ps3_game, game_running, icon_file,
+from .game import (online_on, online_dropped_patches, play_exe, installed_exe, lan_discover, start_lan_server, stop_lan_server, lan_server_running, take_discord_join, all_mods, backup_list, close_gently, disc_info, disc_problem, disc_ps3_game, game_running, icon_file,
     gigabytes, join_check, join_split, language_fallback, language_options, missing, prebuild_mods, prepare_game, release_disc, restore_saves, runtime_switches,
     save_dir, split_game_files, start_game, backup_saves, watch_saves, export_saves, import_saves,
     record_install, lost_save_plan, recover_save, mark_handled, any_game_running)
@@ -2147,7 +2147,12 @@ class Launcher(Look):
         self.refresh_patch_state()
         self.log_set(self.game_log, '')
         self.play_button.configure(text=tr('RUNNING'), state='disabled')
-        self.refresh_status(tr('Game running… the log is in Advanced → Log.'))
+        dropped = online_dropped_patches(env)
+        if dropped:
+            self.refresh_status(tr('Game running online. Cheats are off online ({n} patches left out; they stay '
+                                   'on for single player).', n=len(dropped)))
+        else:
+            self.refresh_status(tr('Game running… the log is in Advanced → Log.'))
         if WINDOWS and not self.embedded and self.s.get('hide_while_playing') == '1':
             self.root.after(4000, self.hide_for_game, self.process)
         threading.Thread(target=self.wait_game, daemon=True).start()
