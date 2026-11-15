@@ -8,6 +8,7 @@
 #include "cellNetCtl.h"
 #include "cellSysutil.h"   /* cellSysutilQueueEvent, CELL_SYSUTIL_MAX_CALLBACKS */
 #include "../../runtime/ppu/ppu_memory.h"   /* vm_base, vm_write32 (guest mem) */
+#include "mpnet.h"
 #include "ps3emu/endian.h" /* ps3_bswap32 -- CellNetCtlInfo/NatInfo integer fields are guest big-endian */
 #include "np_psnr.h"      /* np_psnr_identity -- the player name the MAC derives from */
 #include <stdio.h>
@@ -45,7 +46,7 @@ static int s_netctl_initialized = 0;
 static int netctl_online(void)
 {
     static int v = -1;
-    if (v < 0) v = 0;   /* public source release: always offline (no PS3_NET_ONLINE) */
+    if (v < 0) v = (getenv("PS3_NET_ONLINE") || mpnet_on()) ? 1 : 0;
     return v;
 }
 

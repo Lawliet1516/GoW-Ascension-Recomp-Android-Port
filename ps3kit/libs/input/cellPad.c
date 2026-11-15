@@ -1067,6 +1067,10 @@ static void pad_poll_backend(void)
      * changed, and libpad buffers them; a fresh sweep is a fresh report for
      * every port. cellPadGetData hands each one out exactly once. */
     for (int _i = 0; _i < PAD_MAX_HOST_PORTS; _i++) s_data_fresh[_i] = 1;
+    { static int nohost = -1;   /* mpnet kit: a test window must not follow the player's controller */
+      if (nohost < 0) { const char* e = getenv("PS3_PAD_NO_HOST"); nohost = (e && e[0] == '1') ? 1 : 0; }
+      if (nohost) { memset(&s_host_state[0], 0, sizeof(s_host_state[0])); s_host_state[0].connected = 1;
+                    pad_movie_skip(); return; } }
 
 #if PAD_BACKEND_XINPUT
     pad_poll_xinput();

@@ -78,9 +78,11 @@ s32 sceNpSignalingGetConnectionStatus(SceNpSignalingCtxId ctxId,
 
 s32 sceNpSignalingGetConnectionInfo(SceNpSignalingCtxId ctxId,
                                       SceNpSignalingConnId connId,
-                                      SceNpSignalingConnectionInfo* info);
+                                      s32 code, void* info);
 
-s32 sceNpSignalingGetLocalNetInfo(u32* localAddr, u16* localPort);
+s32 sceNpSignalingGetLocalNetInfo(SceNpSignalingCtxId ctxId, void* netInfo);
+s32 sceNpSignalingAddExtendedHandler(SceNpSignalingCtxId ctxId, SceNpSignalingHandler handler, void* arg);
+s32 sceNpSignalingSetCtxOpt(SceNpSignalingCtxId ctxId, s32 optname, s32 optval);
 s32 sceNpSignalingGetPeerNetInfo(SceNpSignalingCtxId ctxId,
                                    SceNpSignalingConnId connId,
                                    u32* peerAddr, u16* peerPort);

@@ -119,12 +119,6 @@ s32 cellNetResolverStartAsynDNS(u32 resolver_id, const char* hostname,
     if (!hostname || !addr)
         return (s32)CELL_NET_ERROR_INVALID_ARG;
 
-    /* Public source release: offline only. No DNS lookup leaves this PC. */
-    s_resolvers[resolver_id].done = 1;
-    printf("[cellNet] offline build: DNS lookup for %s not made\n", hostname);
-    return (s32)CELL_NET_ERROR_INVALID_ARG;
-
-#if 0   /* the original host lookup, kept for reference */
     /* Synchronous DNS lookup using host resolver */
     struct addrinfo hints, *result = NULL;
     memset(&hints, 0, sizeof(hints));
@@ -147,7 +141,6 @@ s32 cellNetResolverStartAsynDNS(u32 resolver_id, const char* hostname,
     printf("[cellNet] DNS lookup failed for %s\n", hostname);
     s_resolvers[resolver_id].done = 1;
     return (s32)CELL_NET_ERROR_INVALID_ARG;
-#endif
 }
 
 s32 cellNetResolverPollDNS(u32 resolver_id, s32* result)

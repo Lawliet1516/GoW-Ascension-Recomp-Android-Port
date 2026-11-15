@@ -24,7 +24,7 @@ BG, PANEL, CARD, LINE = W.PAGE, W.CARD, W.RAISED, W.LINE
 TEXT, MUTED, ACCENT, ACCENT_HI = W.TEXT, W.MUTED, '#b8872f', W.GOLD
 GOLD, LOG_BG, LOG_FG, OFF = W.GOLD, W.FIELD, '#cfc6bc', W.DIM
 
-PAGES = ('home', 'graphics', 'game', 'controls', 'patches', 'mods', 'advanced', 'support', 'about')
+PAGES = ('home', 'graphics', 'game', 'controls', 'patches', 'mods', 'online', 'advanced', 'support', 'about')
 
 
 def translated(options):
@@ -470,7 +470,7 @@ class Look:
         self.draw_side_logo()
         self.nav, self.current = {}, None
         self.titles = {'home': tr('Home'), 'graphics': tr('Graphics'), 'game': tr('Game'), 'controls': tr('Controls'),
-                       'patches': tr('Patches'), 'mods': tr('Mods'), 'advanced': tr('Advanced'),
+                       'patches': tr('Patches'), 'mods': tr('Mods'), 'online': tr('Online'), 'advanced': tr('Advanced'),
                        'support': tr('Support'), 'about': tr('About'), 'search': tr('Search')}
         for name in PAGES:
             if name == 'support':          # the gold button under the list
@@ -517,6 +517,7 @@ class Look:
         self.build_controls()
         self.build_patches()
         self.build_mods()
+        self.build_online()
         self.build_advanced()
         self.build_support()
         self.build_about()
@@ -1090,6 +1091,10 @@ class Look:
             self.section(f, tr('Picture'))
             for _sw, title, key, options, hint in live:
                 self.row(f, title, self.choice(f, key, options), hint)
+        if self.has('LD_AO'):   # 2026-11-15: ambient occlusion, opt-in
+            self.section(f, tr('Lighting'))
+            self.check(f, 'ambient_occlusion', tr('Ambient occlusion'),
+                       tr('Adds soft contact shadows in corners, under ledges and where characters stand. Not part of the PS3 game. Uses some GPU time; turn it off if something looks wrong.'), badge=tr('NEW'))
         if self.has('LD_UBER'):   # host uber5: the ubershader, opt-in (game.game_environment sets its switches)
             self.section(f, tr('Shaders'))
             self.check(f, 'uber_shaders', tr('Fewer shader stutters (NVIDIA, experimental)'),

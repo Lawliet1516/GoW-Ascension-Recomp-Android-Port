@@ -58,6 +58,44 @@ PPU-5842e8bc5420b6d10eee4cf24243e7d8647e477d:
       - [ byte, 0x0081c9b7, 0x00 ]         # 0x0083ce77
       - [ be32, 0x00369b34, 0x60000000 ]   # 0x00390724
       - [ be32, 0x00369b64, 0x60000000 ]   # 0x00390754
+  "Offline Multiplayer (experimental)":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "Multiplayer without PSN, on this PC only, against the game's own AI waves or in an empty arena: there are no other players. Title screen: press Left or Right to turn to Multi-Player, then Cross. The first visit starts with the multiplayer tutorial (the patch \"Offline Multiplayer: skip the tutorial\" skips it). In the lobby, Game Mode (one step up from Quick Play) lists all seven modes, and Quick Play starts the mode and map chosen in the launcher (Settings: Offline multiplayer mode / map; Trial of the Gods for one player unless changed). The other modes were made for 2 to 8 players: alone, the game declares you the winner after about 10 seconds unless the patch \"Offline Multiplayer: no instant win when alone\" is also on. After a match the lobby starts the next one by itself, on the next map of the list (press START, then Cross, to start it at once). To go back to the main multiplayer lobby instead (another mode or map): wait until the results screen has finished, press Circle twice and Cross, then hold Circle for about two seconds and press Cross. Holding SELECT+START quits the game. The warrior profile (XP, gear, shards, loadouts, the tutorial done) is saved by the game itself after every match, as it was on Sony's online storage, but into a file on this PC: gamedata\\dev_hdd0\\home\\00000001\\tus\\NPWR00802_00\\slot001.dat (earlier copies are kept beside it: .keep = the largest, never overwritten; .bak1-.bak3; .session, .session1, .session2 = how it was at the start of the last three games; if the profile is ever lost, quit the game and copy one of them over slot001.dat). If that file cannot be read (locked by another program, no permission), the lobby stops at a profile error and nothing is saved over it: quit the game (hold SELECT+START), close the program that holds the file, and start again. Progress is first saved after the tutorial is finished; quitting before that starts the tutorial again (unless \"Offline Multiplayer: skip the tutorial\" is on). Cheats also work here and their results are saved into the profile too. Experimental."
+    Patch Version: 3.3
+    Patch:
+      - [ be32, 0x00105730, 0x38600001 ]   # lobby: bl func_0032A8A4 (network gate: IP, PSN sign-in, Online Pass, TSS, EULA, NP ticket, DCDS) -> li r3,1 "passed" (orig 48225175)
+      - [ be32, 0x00110DC0, 0x38600001 ]   # transport selector func_00110DAC: SAM (3) -> Local (1), so no lobby needs PSN, Online Pass or TSS (orig 38600003 li r3,3)
+      - [ be32, 0x001107E8, 0x60000000 ]   # match settings (func_001105F8): bne cr1 "networked mode with >1 player keeps its match type" -> nop, so it is forced to local (orig 40860024)
+      - [ be32, 0x001107F0, 0x60000000 ]   # the same: bne "mode flag 0x40000 (THUN1, Trial of the Gods solo) keeps its match type" -> nop, forced to local too (orig 4082001C)
+      - [ be32, 0x00110768, 0x8062AA00 ]   # Quick Play (match settings with game mode -1 = "any"): lwz r3,0(r31) -> lwz r3,-0x5600(r2) = the mode word 0x819960 (r2 = TOC 0x81EF60) ... (orig 807F0000)
+      - [ be32, 0x0011076C, 0x907F0004 ]   # ... cmpwi r3,3 -> stw r3,4(r31): it becomes the match's mode ... (orig 2C030003)
+      - [ be32, 0x00110770, 0x60000000 ]   # ... beq (quickmatch "any" returns as it is) -> nop: forced to a local match like any other mode; offline there is no matchmaker to pick a mode, the lobby waited forever at "waiting for network game mode allocate" (orig 4182009C)
+      - [ be32, 0x00819960, 0x00000009 ]   # the mode word: 9 = THUN1 (Trial of the Gods, 1 player). 0x819958-0x81997F is alignment padding between .tbss and .data (no section, zero on disc, no code or data reference). The host writes the launcher's choice here once, when the game is loaded (PS3_MP_MODE, host/ascension_patches.cpp) (orig 00000000)
+      - [ be32, 0x00109B14, 0x38600000 ]   # func_00109AC4 interface kind: clrlwi r3,r3,31 (mode flag 1 "networked") -> li r3,0: the local (one-PC) interface for every mode; a mode for 2+ players otherwise waited forever at "waiting to become the server of global level" (orig 546307FE)
+      - [ be32, 0x0010789C, 0x38800001 ]   # func_00107874 players the lobby countdown waits for: lwz r4,0xC(r3) (mode descriptor: 2 to 6) -> li r4,1, one player is enough (orig 8083000C)
+      - [ be32, 0x00103DE8, 0x3BA00000 ]   # enter lobby func_00103BE8: li r29,1 "alone in a mode for 2+ players" -> li r29,0, so [0x884079] (stored at 0x103DF4 / 0x104268) stays 0 and the lobby does not force a rematch on the same map (0x1063DC "triggering a forced rematch", reason 7 "Last Man Standing"): after a match alone the lobby goes on as after a Trial match (next map of the list; hold Circle, then Cross, back to the main lobby) (orig 3BA00001)
+      - [ be32, 0x00122CE4, 0x8082AA04 ]   # level cycle start func_00122C00: li r4,0 -> lwz r4,-0x55FC(r2) = the map word 0x819964, stored as the cycle index [this+0x844]: the first match is on that map of the mode's list (0, the disc value = the first, as before; PS3_MP_MAP) ... (orig 38800000)
+      - [ be32, 0x00122D00, 0x937F0858 ]   # ... stw r4,0x858(r31) -> stw r27,0x858(r31): the second counter stays 0 as before (r27 = 0 in this function) (orig 909F0858)
+      - [ be32, 0x00122B20, 0x8082AA08 ]   # level cycle build func_001229B4: nop -> lwz r4,-0x55F8(r2) = the shuffle word 0x819968 ... (orig 60000000)
+      - [ be32, 0x00122B28, 0x7FA4E850 ]   # ... addic r29,r29,-1 -> subf r29,r4,r29: shuffle counter = levels - word. 1 = the game's own random order (as before); 0x100 (host, when a map is chosen) = no shuffle, the list keeps its data order so the map word means the same map every time (orig 33BDFFFF)
+      - [ be32, 0x00819968, 0x00000001 ]   # the shuffle word: 1 = shuffled as on the PS3 (same padding as the mode word) (orig 00000000)
+      - [ be32, 0x003320D4, 0x38600003 ]   # npTus "usable" func_003320D0: lwz r3,[0x93C3EC] (NP status, 3 = online) -> li r3,3, so the profile load/save (TUS data slot 1) runs, answered from files by the runtime's sceNpTus (orig 8063C3EC)
+      - [ be32, 0x00332A84, 0x2C1FFFFF ]   # npTus init func_00332A2C: cmpwi r31,0 "no own NpId (not signed in) -> fail" -> cmpwi r31,-1 (never equal): the title context is made without an NpId (orig 2C1F0000)
+  "Offline Multiplayer: no instant win when alone":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "For Offline Multiplayer. The modes for 2 to 8 players (Favor of the Gods, Team Favor, Capture the Flag, Trial of the Gods co-op) end about 10 seconds after the start when only one player is in the match (\"last man standing\": 1st place and XP at once, again and again). With this on, the match runs to its timer or objectives instead, so the arena can be played alone. Trial of the Gods for one player is not affected. Off by default: it changes how XP is earned compared with the PS3 game."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x001323F4, 0x38600001 ]   # func_00131D58 last man standing: addic r3,r3,-1 (players in the match - 1) -> li r3,1: the one-player condition is never met (orig 3063FFFF)
+  "Offline Multiplayer: skip the tutorial":
+    Games: *gowa_100_title
+    Author: "GoW Ascension PC port"
+    Notes: "For Offline Multiplayer. A new multiplayer profile starts with the multiplayer tutorial, and it comes back on every visit until it has been finished once. With this on, the lobby opens straight away instead, and the profile is saved after your first match (the tutorial stays marked as not done; turn this off again to play it). Use it if you have played the tutorial before or it keeps coming back. Off by default."
+    Patch Version: 1.0
+    Patch:
+      - [ be32, 0x00105980, 0x3BE00000 ]   # lobby func_00105210 tutorial check: xori r31,r3,1 (flag [0x83CFE2] or profile +0xC "tutorial complete" == 0; the flag is .bss and only ever cleared, at 0x105A3C) -> li r31,0: never forced; the and/bne at 0x10598C-0x105994 then takes the normal lobby path 0x105A90 (orig 687F0001)
   "Cheat: God Mode":
     Games: *gowa_100_title
     Author: "GoW Ascension PC port"

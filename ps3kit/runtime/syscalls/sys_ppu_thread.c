@@ -587,7 +587,15 @@ int64_t sys_ppu_thread_join(ppu_context* ctx)
 
     /* Wait for completion */
 #ifdef _WIN32
-    WaitForSingleObject(t->finish_event, INFINITE);
+    /* mpnet (2026-11-13): a join that waits > 5 s prints every guest thread once (ps3_dump_threads, boot_main.cpp):
+     * the game froze after a failed match in a join and the stuck thread had to be found. */
+    if (WaitForSingleObject(t->finish_event, 5000) == WAIT_TIMEOUT) {
+        extern void (*g_ps3_dump_threads_fn)(const char* label);   /* cellGcmSys.c, set by boot_main.cpp */
+        static volatile long s_dumped;
+        fprintf(stderr, "[WAIT] ppu_thread_join(tid=%llu) still waiting after 5 s\n", (unsigned long long)tid);
+        if (InterlockedExchange(&s_dumped, 1) == 0 && g_ps3_dump_threads_fn) g_ps3_dump_threads_fn("join wait");
+        WaitForSingleObject(t->finish_event, INFINITE);
+    }
 #else
     pthread_mutex_lock(&t->finish_mutex);
     while (!t->finished) {

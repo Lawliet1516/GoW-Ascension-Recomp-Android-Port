@@ -97,6 +97,8 @@ function Add-LiftHooks {
     if ($LASTEXITCODE -ne 0) { Write-Host "texstream_patch failed"; exit 1 }
     python (Join-Path $Root "tools\gamelog_patch.py") $Recomp
     if ($LASTEXITCODE -ne 0) { Write-Host "gamelog_patch failed"; exit 1 }
+    python -I (Join-Path $Root "tools\mksrc.py") $Recomp   # online: SSL off / TSS plain (switched) + 2 NULL guards
+    if ($LASTEXITCODE -ne 0) { Write-Host "mksrc failed"; exit 1 }
 }
 
 if ($Runtime) {

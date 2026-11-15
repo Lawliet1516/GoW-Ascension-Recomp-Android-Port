@@ -89,7 +89,8 @@ if ($Force -or -not (Test-Path (Join-Path $Recomp "ppu_recomp.h"))) {
         & $py (Join-Path $Tools "vram_plan_patch.py") apply $Recomp; if ($LASTEXITCODE) { return }
         & $py (Join-Path $Tools "zprepass_patch.py") $Recomp; if ($LASTEXITCODE) { return }
         & $py (Join-Path $Tools "texstream_patch.py") $Recomp; if ($LASTEXITCODE) { return }
-        & $py (Join-Path $Tools "gamelog_patch.py") $Recomp
+        & $py (Join-Path $Tools "gamelog_patch.py") $Recomp; if ($LASTEXITCODE) { return }
+        & $py -I (Join-Path $Tools "mksrc.py") $Recomp   # online: SSL off / TSS plain (switched) + 2 NULL guards
     }
     Set-Content -NoNewline -Path $stamp -Value ("runtime:" + $md5 + ":" + (Get-FileHash $Sites -Algorithm SHA1).Hash)
 }

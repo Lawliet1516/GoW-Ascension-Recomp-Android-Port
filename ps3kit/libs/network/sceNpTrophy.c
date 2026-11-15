@@ -13,6 +13,7 @@
 #include "ps3emu/guest_call.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <stdint.h>
@@ -188,6 +189,9 @@ s32 sceNpTrophyInit(void* poolPtr, u32 poolSize, u32 containerId, u64 options)
 
     memset(s_contexts, 0, sizeof(s_contexts));
     memset(s_handles, 0, sizeof(s_handles));
+    { const char* td = getenv("PS3_TROPHY_DIR");   /* mpnet kit: test runs keep their own trophy file */
+      if (td && *td) { snprintf(s_storage_path, sizeof(s_storage_path), "%s", td);
+                       printf("[sceNpTrophy] storage %s (PS3_TROPHY_DIR)\n", s_storage_path); } }
     s_trophy_initialized = 1;
     return CELL_OK;
 }

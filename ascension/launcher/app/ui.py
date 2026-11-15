@@ -13,11 +13,12 @@ from . import assets as artwork
 from . import patches as rpcs3
 from .config import (ANISO_LEVELS, APP_NAME, ASPECTS, CONFIG_FILE, CONTROL_GROUPS, CPU_LIMITS, DEADZONES,
     DEFAULTS, DISPLAY_MODES, ENTER_BUTTONS, FPS_CAPS, FPS_LIMIT, GAME_ID, GAME_WINDOWS, HERE, KEY_PRESETS, LOG_DIR, MAC,
+    MP_MODES, mp_map_choices,
     ON_OFF, PAD_BUTTONS, PAD_CONTROLS, PAD_DEFAULTS, PRESETS, RENDERERS, RENDER_SCALES, ROOT, SCALE_FILTERS, SHARPEN_LEVELS, FSR_MODES, SHOT, VIBRANCE_LEVELS,
     TK_KEYS, VERSION, VOICE_LANGUAGES, VSYNC_MODES, WINDOWS, WINDOW_SIZES, asset, fps_limit, fps_unlocked, key_label,
     load_settings,
     save_settings)
-from .game import (play_exe, installed_exe, all_mods, backup_list, close_gently, disc_info, disc_problem, disc_ps3_game, game_running, icon_file,
+from .game import (online_on, play_exe, installed_exe, lan_discover, start_lan_server, stop_lan_server, lan_server_running, take_discord_join, all_mods, backup_list, close_gently, disc_info, disc_problem, disc_ps3_game, game_running, icon_file,
     gigabytes, join_check, join_split, language_fallback, language_options, missing, prebuild_mods, prepare_game, release_disc, restore_saves, runtime_switches,
     save_dir, split_game_files, start_game, backup_saves, watch_saves, export_saves, import_saves,
     record_install, lost_save_plan, recover_save, mark_handled, any_game_running)
@@ -519,6 +520,23 @@ class Launcher(Look):
                       "had been skipped with the controller. The in-engine scenes still play. The Skip intro mod "
                       "(Mods) also removes the notice and logo screens at start."),
                    badge=None if self.has('PS3_SKIP_MOVIES') else tr('NEEDS A NEWER BUILD'))
+        if self.has('PS3_MP_MODE'):
+            # Offline Multiplayer (Patches): what its Quick Play starts. The map list follows the mode.
+            self.section(f, tr('Offline multiplayer'))
+            self.row(f, tr('Offline multiplayer mode'), self.choice(f, 'mp_mode', MP_MODES, width=36),
+                     tr('The mode that Quick Play starts in the multiplayer lobby (Game Mode, one step up from Quick '
+                        'Play there, lists every mode too). Needs the patch "Offline Multiplayer (experimental)" '
+                        '(Patches). The modes for 2 to 8 players are played alone here: the game then declares you '
+                        'the winner after about 10 seconds, unless the patch "Offline Multiplayer: no instant win '
+                        'when alone" is on too.'))
+            self.row(f, tr('Offline multiplayer map'),
+                     self.choice(f, 'mp_map', lambda: mp_map_choices(self.var('mp_mode').get()), width=36),
+                     tr('The map of the first match. After a match the lobby starts the next one by itself: Trial '
+                        "of the Gods on the next map of the mode's list, the other modes on a map again (the same one "
+                        "when a map is chosen here). A mode picked in the game's own Game Mode menu starts at "
+                        'the same place of its own list. Both are read when the game starts: to change them, quit '
+                        'the game (hold SELECT+START) and press PLAY again.'))
+            self.var('mp_mode').trace_add('write', lambda *_: self.refresh_choices('mp_map', 'cycle'))
         self.section(f, tr('Language'))
         self.row(f, tr('Game language'), self.choice(f, 'language', self.languages),
                  tr("Text, subtitles and voices follow the PS3's system language. Greek voices: the game itself "
@@ -1336,6 +1354,312 @@ class Launcher(Look):
         if 0 <= j < len(self.mod_order):
             self.mod_order[i], self.mod_order[j] = self.mod_order[j], self.mod_order[i]
             self.refresh_mods()
+
+    # ---- advanced -------------------------------------------------------------------------------
+    def build_online(self):
+        f = self.scrolled_page('online', tr('Online'),
+                               tr('Community multiplayer: Quick Match, the Game Mode list and private matches with friends.'))
+        self.section(f, tr('Online multiplayer'), top=4)
+        self.check(f, 'online', tr('Play online (community server)'),
+                   tr('Multi-Player then finds other players through the community server below. Your own Online '
+                      'Pass from your PS3 is needed, as on the PS3: the game checks it itself. Only visual patches '
+                      '(Unlock FPS, motion blur, depth of field, MLAA) may be on; any other patch switches online off. '
+                      'Mods are left out while online so everyone loads the same game data, except Skip intro and the 1.04 sound '
+                      'mix, which do not change it.'))
+        self.row(f, tr('Server'), self.ttk.Entry(f, textvariable=self.var('online_server'), width=30),
+                 tr("The community server's address (for example 192.168.1.20 at home, or a name). Ask the server's "
+                    'host. It never contacts Sony.'))
+        self.server_pick = self.tk.StringVar()
+        self.server_box = self.ttk.Combobox(f, textvariable=self.server_pick, state='readonly', width=46)
+        self.server_box.bind('<<ComboboxSelected>>', lambda e: self.online_pick_server())
+        self.server_box.bind('<MouseWheel>', lambda e: 'break')
+        self.row(f, tr('Pick a server'), self.server_box,
+                 tr('The community servers with your ping to each, nearest first, and the LAN servers on your own '
+                    'network. Everyone you play with must use the same server. Refresh measures again.'))
+        self.buttons(f, ((tr('Refresh'), self.online_load_servers),), top=4)
+        self.section(f, tr('LAN play'))
+        self.note(f, tr('Play with people on your own network (same router), no internet server needed: one player '
+                        'presses Host a LAN server, the others press Refresh and pick it above. Allow Python in the '
+                        'Windows Firewall when it asks (private networks). The server stops when you press Stop or '
+                        'close the launcher. Everyone still needs their own Online Pass.'), top=4)
+        self.buttons(f, ((tr('Host a LAN server'), self.online_host_lan), (tr('Stop LAN server'), self.online_stop_lan)),
+                     top=6)
+        self.lan_status = self.note(f, '', top=6)
+        self.server_choices = {}
+        self.root.after(300, self.online_load_servers)
+        self.row(f, tr('Player name'), self.ttk.Entry(f, textvariable=self.var('online_name'), width=20),
+                 tr('Up to 16 letters or digits. The first time you sign in, the server keeps this name for this PC '
+                    '(a key file next to your saves proves it is you).'))
+        self.row(f, tr('Network port'), self.ttk.Entry(f, textvariable=self.var('online_port'), width=8),
+                 tr("UDP port for the game's own player-to-player traffic (3658). Allow it in your firewall on "
+                    'private networks.'))
+        self.path_row(f, 'online_exe', tr('Online executable'),
+                      hint=tr('Empty: AscensionRecomp.online.exe next to the game, if it is there (the online test package has it).'))
+        self.check(f, 'online_discord', tr('Show on Discord'),
+                   tr('Your Discord profile shows what you play (lobby, searching, the mode of the match), through '
+                      'the Discord app on this PC. With a match code, friends get a Join button that fills in '
+                      'your server and code for them. No Discord sign-in, nothing is sent to Discord while it is off.'))
+        self.section(f, tr('Private match'))
+        self.row(f, tr('Match code'), self.ttk.Entry(f, textvariable=self.var('online_party'), width=14),
+                 tr('Host: press New code, then Copy code and send it to your friends: it carries your server too '
+                    '(CODE@server), so pasting it here puts them on your server. Everyone with the same code is matched '
+                    'only with each other (Quick Match or a Game Mode pick). Empty: public matches.'))
+        self.buttons(f, ((tr('New code'), self.online_new_code), (tr('Copy code'), self.online_copy_code),
+                         (tr('Clear'), lambda: self.var('online_party').set(''))), top=6)
+        self.online_status = self.note(f, '', top=6)
+        joined = take_discord_join(self.s)
+        if joined:
+            self.var('online_server').set(joined[0])
+            self.var('online_party').set(joined[1])
+            self.var('online').set('1')
+            self.online_status.configure(text=tr('Discord invite: server {server}, code {code}. Press Play.',
+                                                 server=joined[0], code=joined[1]))
+        self.section(f, tr('Leaderboards'))
+        self.note(f, tr("The best players on the server above, from the stats each game saves after a match (XP, "
+                        "favor, kills, wins, matches, trial waves). Reported by players' games (not verified)."), top=4)
+        self.buttons(f, ((tr('Show leaderboards'), self.online_show_leaderboards),
+                         (tr('Open in browser'), self.online_open_leaderboards)), top=6)
+        b = self.body(f)
+        self.online_boards = self.ttk.Frame(b)
+        self.online_boards.grid(row=b.grid_size()[1], column=0, columnspan=2, sticky='w')
+        self.section(f, tr('Community servers'))
+        self.note(f, tr('Servers other players run. Show servers asks the server above for its list; Use puts an '
+                        'address above.'), top=4)
+        self.buttons(f, ((tr('Show servers'), self.online_list_servers),), top=6)
+        b = self.body(f)
+        self.online_servers = self.ttk.Frame(b)
+        self.online_servers.grid(row=b.grid_size()[1], column=0, columnspan=2, sticky='w')
+
+    @staticmethod
+    def server_host(address):
+        """An address as the Server box keeps it: the default HTTP port 36101 left out."""
+        a = (address or '').strip()
+        return a[:-len(':36101')] if a.endswith(':36101') else a
+
+    def online_load_servers(self):
+        """Fill the server picker (2026-11-13): the known servers plus each one's own list, with a ping to each
+        (the time of one small HTTP request, best of two), nearest first. Runs in a thread; only these servers
+        are contacted."""
+        import json
+        import threading
+        import time
+        import urllib.request
+        from .config import KNOWN_SERVERS
+        if not getattr(self, 'server_box', None):
+            return
+        self.server_box.configure(values=[tr('Measuring…')])
+        self.server_pick.set(tr('Measuring…'))
+
+        def get(host, path):
+            with urllib.request.urlopen('http://%s:36101%s' % (host, path), timeout=3) as r:
+                return r.read(65536)
+
+        def work():
+            found = {}
+            try:   # LAN play (2026-11-15): servers on this network answer a broadcast
+                for sv in lan_discover(1.0):
+                    found.setdefault(sv['address'], (sv['name'], 'LAN'))
+            except Exception:
+                pass
+            for name, addr, region in KNOWN_SERVERS:
+                found.setdefault(self.server_host(addr), (name, region))
+            for name, addr, region in KNOWN_SERVERS:
+                try:
+                    for sv in json.loads(get(self.server_host(addr), '/api/servers'))['servers'][:30]:
+                        h = self.server_host(str(sv.get('address', '')))
+                        if h and h not in found:
+                            found[h] = (str(sv.get('name', h))[:40], str(sv.get('region', ''))[:24])
+                except Exception:      # an unreachable server only loses its list
+                    pass
+            rows = []
+            for h, (name, region) in found.items():
+                best, st = None, {}
+                for _ in range(2):
+                    t0 = time.perf_counter()
+                    try:
+                        st = json.loads(get(h, '/api/status')) or st
+                        ms = (time.perf_counter() - t0) * 500   # one request = connect + answer = 2 round trips
+                        best = ms if best is None else min(best, ms)
+                    except Exception:
+                        pass
+                rows.append((best if best is not None else 1e9, h, name, region,
+                             int(st.get('players_online') or 0), int(st.get('searching') or 0)))
+            rows.sort()
+            self.root.after(0, lambda: self.online_fill_servers(rows))
+        threading.Thread(target=work, daemon=True).start()
+
+    AUTO_LABEL = None
+
+    def online_fill_servers(self, rows):
+        """Server browser (2026-11-15): ping, players online and searching per server; first choice Auto = the server
+        where people are searching right now (then where people are online), else the nearest."""
+        self.server_choices = {}
+        labels = []
+        live = [r for r in rows if r[0] < 1e9]
+        if live:
+            pick = sorted(live, key=lambda r: (-(r[5] > 0), -(r[4] > 0), r[0]))[0]
+            why = (tr('players searching') if pick[5] else tr('players online') if pick[4] else tr('nearest'))
+            auto = tr('Auto: {name} ({why})', name=pick[2], why=why)
+            self.server_choices[auto] = pick[1]
+            labels.append(auto)
+        for ms, h, name, region, online, searching in rows:
+            ping = tr('offline') if ms >= 1e9 else '%d ms' % ms
+            who = tr('{n} online', n=online) + (tr(', {n} searching', n=searching) if searching else '')
+            label = '%s  ·  %s  ·  %s  ·  %s' % (name, region or '?', ping, who)
+            self.server_choices[label] = h
+            labels.append(label)
+        self.server_box.configure(values=labels)
+        current = self.server_host(self.var('online_server').get())
+        self.server_pick.set(next((l for l, h in self.server_choices.items() if h == current),
+                                  tr('Other: {address}', address=current) if current else ''))
+
+    def online_host_lan(self):
+        name = (self.var('online_name').get() or '').strip()
+        addr, err = start_lan_server((name + "'s LAN") if name else 'LAN server')
+        if err:
+            self.lan_status.configure(text=tr('Could not start the LAN server: {error}', error=err))
+            return
+        self.var('online_server').set(addr)
+        self.var('online').set('1')
+        self.lan_status.configure(text=tr('LAN server running on {address}. Others on your network: Refresh, pick it, '
+                                          'Play.', address=addr))
+        self.online_load_servers()
+
+    def online_stop_lan(self):
+        was = lan_server_running()
+        stop_lan_server()
+        self.lan_status.configure(text=tr('LAN server stopped.') if was else tr('No LAN server is running.'))
+
+    def online_pick_server(self):
+        h = self.server_choices.get(self.server_pick.get())
+        if h:
+            self.var('online_server').set(h)
+
+    def online_url(self, path):
+        server = (self.var('online_server').get() or '').strip()
+        if not server:
+            raise ValueError(tr('Enter the server address first.'))
+        host = server if ':' in server else server + ':36101'
+        return 'http://' + host + path
+
+    def online_fetch(self, path, done):
+        """GET a small answer from the community server in a thread; done(text or None, error) on the UI thread."""
+        import threading
+        import urllib.request
+        try:
+            url = self.online_url(path)
+        except ValueError as e:
+            done(None, str(e))
+            return
+
+        def work():
+            try:
+                with urllib.request.urlopen(url, timeout=4) as r:
+                    text, err = r.read(65536).decode('utf-8', 'replace'), None
+            except Exception as e:     # any network error ends up in the status line
+                text, err = None, str(e)
+            self.root.after(0, lambda: done(text, err))
+        threading.Thread(target=work, daemon=True).start()
+
+    def online_leaderboard_page(self):
+        """The server's public leaderboard page: HTTPS for the known servers (their sslip.io certificate), else HTTP."""
+        from .config import KNOWN_SERVERS
+        server = self.server_host(self.var('online_server').get())
+        if not server:
+            raise ValueError(tr('Enter the server address first.'))
+        host = server.split(':')[0]
+        if host in {a for _n, a, _r in KNOWN_SERVERS}:
+            return 'https://%s.sslip.io/leaderboard' % host.replace('.', '-')
+        return self.online_url('/leaderboard')
+
+    def online_open_leaderboards(self):
+        try:
+            webbrowser.open(self.online_leaderboard_page())
+        except ValueError as e:
+            self.online_status.configure(text=str(e))
+
+    def online_show_leaderboards(self):
+        """Top 5 of each board from the server above (GET /api/leaderboard, 2026-11-14), shown on this page."""
+        import json
+
+        def done(text, err):
+            for w in self.online_boards.winfo_children():
+                w.destroy()
+            try:
+                d = json.loads(text) if text else None
+                boards = d['boards'] if d else None
+            except (ValueError, KeyError, TypeError):
+                boards = None
+            if boards is None:
+                self.ttk.Label(self.online_boards, text=tr('Could not read the leaderboards: {error}', error=err or '?'),
+                               style='Muted.TLabel').grid(row=0, column=0, sticky='w')
+                return
+            row = 0
+            for i, bd in enumerate(boards[:8]):
+                col = (i % 2) * 2
+                if i % 2 == 0 and i:
+                    row += 7
+                self.ttk.Label(self.online_boards, text=tr(str(bd.get('title', '?'))),
+                               style='Value.TLabel').grid(
+                    row=row, column=col, sticky='w', pady=(8, 0), padx=(0, 6))
+                rows = bd.get('rows') or []
+                if not rows:
+                    self.ttk.Label(self.online_boards, text=tr('No reports yet.'), style='Muted.TLabel').grid(
+                        row=row + 1, column=col, sticky='w', padx=(0, 30))
+                for j, r in enumerate(rows[:5]):
+                    self.ttk.Label(self.online_boards, text='%s. %s  -  %s' % (
+                        r.get('rank', '?'), str(r.get('name', '?'))[:16], '{:,}'.format(int(r.get('value', 0))))).grid(
+                        row=row + 1 + j, column=col, sticky='w', padx=(0, 30))
+            self.ttk.Label(self.online_boards, text=tr("Reported by players' games (not verified). This server only."),
+                           style='Muted.TLabel').grid(row=row + 7, column=0, columnspan=4, sticky='w', pady=(8, 0))
+        self.online_fetch('/api/leaderboard?n=5', done)
+
+    def online_new_code(self):
+        def done(text, err):
+            code = (text or '').strip()
+            if code.isalnum():
+                self.var('online_party').set(code)
+                self.online_status.configure(text=tr('New code {code}: send it to your friends.', code=code))
+            else:
+                self.online_status.configure(text=tr('Could not get a code: {error}', error=err or code))
+        self.online_fetch('/api/party/new', done)
+
+    def online_copy_code(self):
+        from .game import split_invite
+        code, host = split_invite(self.var('online_party').get())
+        if code:
+            host = host or self.server_host(self.var('online_server').get())
+            text = code + ('@' + host if host else '')
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self.online_status.configure(text=tr('Copied {text}: your friends paste it into Match code and land on your '
+                                                 'server with your code.', text=text))
+
+    def online_list_servers(self):
+        import json
+
+        def done(text, err):
+            for w in self.online_servers.winfo_children():
+                w.destroy()
+            try:
+                servers = json.loads(text)['servers'] if text else None
+            except (ValueError, KeyError, TypeError):
+                servers = None
+            if servers is None:
+                self.ttk.Label(self.online_servers, text=tr('Could not read the list: {error}', error=err or '?'),
+                               style='Muted.TLabel').grid(row=0, column=0, sticky='w')
+                return
+            if not servers:
+                self.ttk.Label(self.online_servers, text=tr('No community servers listed yet.'),
+                               style='Muted.TLabel').grid(row=0, column=0, sticky='w')
+            for i, sv in enumerate(servers[:30]):
+                text = '%s  -  %s  %s' % (sv.get('name', '?'), sv.get('address', '?'),
+                                          ('(' + sv['region'] + ')') if sv.get('region') else '')
+                self.ttk.Label(self.online_servers, text=text).grid(row=i, column=0, sticky='w', pady=(4, 0))
+                self.ttk.Button(self.online_servers, text=tr('Use'),
+                                command=lambda a=sv.get('address', ''): self.var('online_server').set(a)
+                                ).grid(row=i, column=1, sticky='w', padx=(12, 0), pady=(4, 0))
+        self.online_fetch('/api/servers', done)
 
     def build_advanced(self):
         f = self.scrolled_page('advanced', tr('Advanced'), tr('Game files, the launcher, runtime variables and the log.'))

@@ -949,13 +949,19 @@ static void sys_spinlock_unlock(ppu_context* ctx)
     _InterlockedExchange(spin_word(ea), 0);
 }
 
+extern "C" int mpnet_on(void);
+
 extern "C" void ppu_sysprx_register(void)
 {
     ps3_hle_register_ctx(0x15BAE46Bu, "_cellGcmInitBody", hle_cellGcmInitBody);
     ps3_hle_register_ctx(0xEBE5F72Fu, "_sys_spu_image_import", hle_sys_spu_image_import);
 
-    /* Public source release: offline only. The network imports are answered by
-     * the offline model in libs/network/sysNet.c; no host sockets are opened. */
+    /* PS3_NET_ONLINE: real host sockets (libs/network/sysNet.c). Registered
+     * first because the first registration of a NID wins, so these shadow the
+     * offline model below; without the variable nothing changes. */
+    /* mpnet (2026-11-13): online mode (PS3_MPNET=1, allowed patches only) needs the host sockets too, so it
+     * turns them on itself -- the laptop test forgot PS3_NET_ONLINE and the game could sign in but never search. */
+    if (getenv("PS3_NET_ONLINE") || mpnet_on()) ps3_net_host_register(gcm_guest_alloc);
     /* sceNpScore ranking calls take up to 15 arguments: the ones past r10
      * come off the stack, so they need the full context. */
     np_score_register_ctx();

@@ -22,3 +22,7 @@ __pycache__/
 !/.env.example
 keys.txt
 /launcher/keys.txt
+# Online play: the built Discord helper (+ SDK DLL) and the server code copied in for LAN hosting.
+/discord/
+/server/*
+!/server/README.md

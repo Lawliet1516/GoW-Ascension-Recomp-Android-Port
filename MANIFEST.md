@@ -24,10 +24,12 @@ finds `../ps3kit` by itself and `.env` needs no path changes for them.
 | `ascension/scripts/windows/` (prepare, build, env, apply-patches, relift, relift-spu, run, launcher, snap, pgo-train, test-*) | build and run scripts | own code; paths come from `.env` |
 | `ascension/tools/*.py`, `jobmods_extra_funcs.json`, `job_fragments.json` | patch tools, lift hooks, carving, analysis | own code; the JSON files hold addresses only |
 | `ascension/meta/functions.json`, `EBOOT.imports.json` | function start/end addresses; firmware import NIDs | addresses and public NIDs only, no game bytes (the lifter needs them) |
-| `ascension/launcher/` (app/, lang/, ascension_launcher.py, Cinzel font + OFL, README.md, supporters.txt) | the launcher | own code (unself.py: GPL-2.0, from RPCS3); online parts removed; no console keys |
+| `ascension/launcher/` (app/, lang/, ascension_launcher.py, Cinzel font + OFL, README.md, supporters.txt) | the launcher | own code (unself.py: GPL-2.0, from RPCS3); no console keys; no server addresses |
 | `ascension/packaging/` | icon drawing script, icons, launcher stub | own artwork (drawn by make_icons.py) |
 | `ascension/patches-rpcs3/ascension-1.00.yml` | RPCS3-format patches for 1.00 | small community patches with credit (ZEROx, illusion; 1.04 ports) and the port's own cheats; a few original instruction words appear in comments only |
 | `ascension/mods-builtin/skip-intro/mod.json` | Skip intro mod recipe | a recipe (writes an empty text file into your own archive), no game data |
+| `ascension/discord-helper/` (gowa_discord.cpp, build.cmd) | Discord Rich Presence + Join helper source (online play) | own code; builds against the Discord Social SDK you download |
+| `ascension/tools/mksrc.py`, `ascension/server/README.md` | online post-lift patches (run by prepare.ps1); where LAN hosting finds the server code | own code (one-line patterns, no game bytes) |
 | `LICENSE`, `README.md`, `MANIFEST.md`, `licenses/` | licences, docs | |
 
 Count: see the end of this file.
@@ -44,8 +46,8 @@ Count: see the end of this file.
 | `ascension/host/*.md`, `*.diff` | lab notes |
 | `ascension/captures/`, `gamedata/`, `build/`, `scratch/`, `my-changes/`, `ascension-recomp/work/`, `shots/` | frames of the game, saves, build outputs, test folders |
 | `*.bin`, `*.ls`, `recomp_spu_ls.bin`, `relbuild131.out` (ascension root) | SPU local-store dumps and logs |
-| `ascension/.env`, `mpnet-token.txt` | local settings, an online sign-in token |
-| `ascension/discord/` | Discord helper (multiplayer) |
+| `ascension/.env`, `mpnet-token.txt` | local settings, a player's online sign-in key |
+| `ascension/discord/` | the built Discord helper and the Discord SDK DLL (the source is in `discord-helper/`) |
 | `ascension/launcher-c/` | an older copy of the launcher |
 | `ascension/patches/ps3recomp-00xx.patch` | history: already applied inside `ps3kit/` |
 | `ascension/docs/` (old README.en, MILESTONES, screenshots) | out of date; screenshots show game art |
@@ -53,24 +55,33 @@ Count: see the end of this file.
 | `ascension/scripts/windows/` agent-build, bench-heavy, bootloop, burst, heavy, soak, flagtest, mute-game, set-affinity, spu-replay, build-gpu; `scripts/linux`, `mac`, `unix` | lab scripts tied to the author's saves and PC; the RPCS3 renderer build (its gpu/ folder is not public); untested platforms |
 | `ps3kit/.git`, `.github/`, `scratch/`, `__pycache__`, `*.orig`, `*.bak*`, `stderr_*.txt` | history, CI of upstream, scratch files |
 | `ps3kit/docs/RSXFIFOCommands - PS3 Developer wiki.pdf`, `docs/rsxfifo.txt` | copies of a third-party wiki |
-| `ps3kit/docs/ONLINE.md` | online play documentation (online was removed) |
 
-## Multiplayer removed
+## Online multiplayer (added back for 0.1.32)
 
-Online and multiplayer were removed; nothing in this tree contacts a game server.
+The 0.1.31 source release had multiplayer removed; 0.1.32 brings it back, with **no server address** anywhere in the
+tree (players type one, paste an invite code, or find a LAN server).
 
-- **Runtime (`ps3kit/libs/network`)**: `mpnet.c`, `mpnet.h`, `mpnet_sha256.c`, `sceNpEula.c/.h` removed. `cellHttp.c`, `cellNetCtl.c`, `sceNp.c`, `sceNpLookup.c`, `sceNpSignaling.c/.h`, `sceNpTrophy.c`, `sceNpTus.c/.h`, `sysNet.h` are the versions from before the multiplayer work (2026-11-04). On top of that:
-  - `sysNet.c` is a small offline stub (no host sockets; every socket call fails like a console with no network).
-  - `np_psnr.c` is an offline stub (the psnr matchmaking client `psnr/psnr.c` is removed; only the local player name for the console identity is kept, so saves are unchanged).
-  - `cellNetCtl.c` always reports "not connected" (`PS3_NET_ONLINE` is ignored).
-  - `cellHttp.c` refuses to send any request (offline build).
-  - `cellNet.c` makes no DNS lookup (the resolver always fails, offline build).
-  - `runtime/ppu/ppu_sysprx.cpp` no longer registers host sockets; `libs/input/cellPad.c` lost the `PS3_PAD_NO_HOST` test switch; `runtime/syscalls/sys_ppu_thread.c` is the pre-multiplayer version.
-  - Tests of the removed online code removed (`libs/network/tests/test_np_matching2.c`, `test_np_nat.c`, `test_np_identity.c`, `test_sys_net.c`, `test_socket_sigpipe.c`, `test_score_init.c`, `tools/test_sys_net.py`, `tools/test_socket_sigpipe.py`).
-- **Translated game code**: the dev tree's `mksrc.py` online lines (SSL off, TSS plaintext, two NULL guards) are not applied; prepare.ps1 makes a plain lift.
-- **Offline Multiplayer patches removed** as well ("Offline Multiplayer (experimental)", "... no instant win when alone", "... skip the tutorial"): they bypass the game's network gate (PSN sign-in, Online Pass, TSS), so they are not published. The launcher's offline multiplayer mode/map settings and `ascension_patches.cpp`'s mode/map writer are removed too.
-- **Launcher**: the Online page, community server list (`KNOWN_SERVERS`, two server IPs), leaderboards, match codes, Discord helper start/join, online token file, Online Pass check, online mods composer, multiplayer profile backups, `online_*` / `mp_*` settings and their translations removed.
-- **Not included**: the community server, the Discord bot and helper, server addresses, tokens, admin keys.
+- **Runtime (`ps3kit/libs/network`)**: `mpnet.c/.h`, `mpnet_sha256.c` (community-server client: challenge sign-in,
+  signed ticket, peer addresses, relay, optional HTTPS), `sceNpEula.c/.h`, and the online versions of `cellHttp.c`,
+  `cellNet.c`, `cellNetCtl.c`, `np_psnr.c` + `psnr/`, `sceNp.c`, `sceNpLookup.c`, `sceNpSignaling.c/.h`,
+  `sceNpTrophy.c`, `sceNpTus.c/.h`, `sysNet.c/.h`; `runtime/ppu/ppu_sysprx.cpp` (host sockets),
+  `runtime/syscalls/sys_ppu_thread.c`, `libs/input/cellPad.c` (test switches). Their tests are back
+  (`libs/network/tests/test_np_*`, `test_sys_net.c`, `test_socket_sigpipe.c`, `test_score_init.c`,
+  `tools/test_sys_net.py`, `tools/test_socket_sigpipe.py`) and `docs/ONLINE.md`.
+- **Translated game code**: `ascension/tools/mksrc.py` runs after the lift (`prepare.ps1`, `apply-patches.ps1`):
+  SSL off and plain-text match settings, both switched on only while online play is on, plus two NULL guards.
+  **The game's Online Pass check is not touched**: every player needs their own pass.
+- **Offline Multiplayer patches** ("Offline Multiplayer (experimental)", "... no instant win when alone",
+  "... skip the tutorial") in `patches-rpcs3/ascension-1.00.yml`, the launcher's mode/map settings and
+  `ascension_patches.cpp`'s mode/map writer are back.
+- **Launcher**: the Online page (server, player name, match codes with their server, LAN play, server list with ping
+  and players, leaderboards, Discord), the online token file, the Online Pass check on PLAY, the online mods composer
+  (only Skip intro and the 1.04 sound mix stay on online). `KNOWN_SERVERS` is empty and the default server is blank.
+- **Server**: not in this tree; it is its own repository,
+  [gowa-community-server](https://github.com/bc160201983/gowa-community-server). Copy its `server/` folder to
+  `ascension/server/` for the launcher's *Host a LAN server*.
+- **Not included**: server addresses, players' sign-in keys (`mpnet-token.txt`), server keys and account databases,
+  admin keys, the author's test notes and logs.
 
 ## Other changes made for this release
 

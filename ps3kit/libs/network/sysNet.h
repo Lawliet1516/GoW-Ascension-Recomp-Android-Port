@@ -177,6 +177,7 @@ int32_t  sys_net_bnet_inet_pton(int32_t family, const char* src, void* dst);
 int32_t  sys_net_bnet_inet_aton(const char* cp, uint32_t* inp);
 uint32_t sys_net_bnet_inet_addr(const char* cp);
 uint32_t sys_net_bnet_inet_ntoa(uint32_t addr);
+uint32_t sys_net_bnet_inet_ntop(int32_t family, const void* src, char* dst, uint32_t size);
 uint32_t sys_net_bnet_gethostbyname(const char* name);
 
 /* Guest address of the errno cell. */

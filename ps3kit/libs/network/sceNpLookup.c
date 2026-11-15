@@ -18,6 +18,8 @@
 
 #include "sceNp.h"
 #include "../../runtime/ppu/ppu_memory.h"
+#include "mpnet.h"
+#include <stdio.h>
 
 #include <string.h>
 
@@ -75,10 +77,12 @@ s32 sceNpLookupAbortTransaction(s32 transId)
 }
 
 /* Everything completes at the call. */
+static s32 s_trans_result[TRANS_MAX + 1];   /* what PollAsync reports (TSS: the size received) */
+
 s32 sceNpLookupPollAsync(s32 transId, u32 result)
 {
     if (!trans_ok(transId)) return (s32)LOOKUP_ERROR_INVALID_ID;
-    if (result) vm_write32(result, 0);
+    if (result) vm_write32(result, (u32)s_trans_result[transId]);
     return 0;
 }
 
@@ -134,4 +138,32 @@ s32 sceNpLookupAvatarImageAsync(s32 transId, u32 avatarUrl, u32 avatarImage, s32
 s32 sceNpLookupAvatarImage(s32 transId, u32 avatarUrl, u32 avatarImage, u32 option)
 {
     return sceNpLookupAvatarImageAsync(transId, avatarUrl, avatarImage, 0, option);
+}
+/* Title Small Storage (mpnet): the community server's /tss blob, a PLAINTEXT container (the game's own
+ * decrypt is skipped by source patch 2): u32 version 1, u32 0, u32 0, u32 count, then count entries of
+ * {char name[32]; u16 size; u16 offset; u32 version; u32 id} and the NUL-terminated JSON documents.
+ * (transId, data*, maxSize, contentLength*, prio, option) */
+s32 sceNpLookupTitleSmallStorageAsync(s32 transId, u32 data, u32 maxSize, u32 contentLength, s32 prio, u32 option)
+{
+    (void)prio; (void)option;
+    if (!trans_ok(transId)) return (s32)LOOKUP_ERROR_INVALID_ID;
+    s_trans_result[transId] = 0;
+    if (!mpnet_on()) {
+        printf("[sceNpLookup] TitleSmallStorage(max=%u) -> offline, nothing\n", maxSize);
+        if (contentLength) vm_write32(contentLength, 0);
+        s_trans_result[transId] = (s32)0x8002A1A5u;   /* "not found"-style error (best guess) */
+        return CELL_OK;
+    }
+    int st = 0, n = -1;
+    if (data && maxSize) n = mpnet_http_get("/tss", vm_ptr8(data), (int)maxSize, &st);
+    if (n < 0 || st != 200) n = 0;
+    if (contentLength) vm_write32(contentLength, (u32)n);
+    s_trans_result[transId] = n;
+    printf("[sceNpLookup] TitleSmallStorage(max=%u) -> %d bytes (http %d)\n", maxSize, n, st);
+    return CELL_OK;
+}
+
+s32 sceNpLookupTitleSmallStorage(s32 transId, u32 data, u32 maxSize, u32 contentLength, u32 option)
+{
+    return sceNpLookupTitleSmallStorageAsync(transId, data, maxSize, contentLength, 0, option);
 }

@@ -20,7 +20,8 @@ It is a **static recompilation**, not an emulator. Tools in this repository tran
 >
 > This is a fan project. It is not affiliated with Sony Interactive Entertainment or Santa Monica Studio. God of War is a trademark of Sony Interactive Entertainment.
 
-**Single player only.** Online and multiplayer were removed from this source release. Nothing in it connects to a game server.
+**Single player and community online multiplayer.** The game's multiplayer works through **community servers** that
+anyone can run (no Sony servers): see [Online multiplayer](#online-multiplayer). No server address is built in.
 
 ## Download (ready to play)
 
@@ -107,7 +108,35 @@ The 4- and 6-core rows are this PC limited to fewer cores, which is faster than 
 - **AMD FSR frame generation runs the game at half your refresh rate:** below 120 Hz use Off or Anti-aliasing.
 - **Needs a CPU with AVX2** (no Intel Core 2nd/3rd gen, no AMD FX) and a DirectX 12 card with Shader Model 6 (old Intel HD 4000/4600 graphics usually cannot run it). The launcher says so when this is the reason.
 - **Offline Multiplayer (experimental):** going back to the main MP lobby with the buttons does not always work; hold SELECT + START to quit.
-- **Online multiplayer is not included** in this public version.
+- **Online multiplayer:** players far apart (another continent) get high lag; players behind carrier-grade NAT always
+  go through the server's relay. The host leaving a 3+ player match ends it (the game never finished host migration).
+
+## Online multiplayer
+
+The game's own multiplayer (Quick Match, the Game Mode list, Favor of the Gods, Team Favor, Capture the Flag, Trial of
+the Gods solo and co-op, 2 to 8 players) works again through **community servers**. Nothing here contacts Sony.
+
+- **Every player needs their own Online Pass** from their PS3, exactly as on the console: the game checks it itself
+  and nothing in this repository changes or skips that check. Put it at
+  `ascension\gamedata\dev_hdd0\game\<BCUS98232 or BCES01741>\USRDIR\DLC\DLC0\INDEX.EDAT`.
+- **Players of one match need the same game region** (USA with USA, Europe with Europe) and the same server.
+- **Launcher, Online page:** turn on *Play online*, type a server address (or pick one under *Pick a server*: LAN
+  servers on your network appear by themselves), choose a player name, press Play.
+- **Private matches:** *New code* then *Copy code* gives `CODE@server`; friends paste it into *Match code* and land on
+  the same server and match.
+- **LAN play:** one player presses *Host a LAN server* (the launcher runs the server with its own Python); the others
+  press *Refresh* and pick it. The launcher looks for the server code in `ascension\server\`: copy the `server\`
+  folder of the server repository there.
+- **Run a server:** [gowa-community-server](https://github.com/bc160201983/gowa-community-server) (Python, one-command
+  Linux installer, Windows starter, admin page, leaderboards, LAN discovery). Its
+  [hosting guide](https://github.com/bc160201983/gowa-community-server/blob/main/docs/HOSTING-GUIDE.md) also explains
+  how to get a server into the launcher's list.
+- **Discord:** *Show on Discord* starts `ascension\discord\gowa_discord.exe` (Rich Presence and a Join button); build
+  it from `ascension\discord-helper\` (needs the Discord Social SDK).
+- **How it works:** `ps3kit/libs/network/mpnet.c` (sign-in, ticket, peer addresses, relay, HTTPS), the NP/network HLE
+  next to it, and `ascension/tools/mksrc.py`, which `prepare.ps1` runs after the lift (it switches the matchmaker's SSL
+  wrapper off and reads the match settings as plain text while online play is on; a community server has no Sony
+  certificate). Details: `ps3kit/docs/ONLINE.md`.
 
 ## What is in here
 

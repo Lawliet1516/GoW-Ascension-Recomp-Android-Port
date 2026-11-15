@@ -20,6 +20,12 @@
 //                                 between PATCH-LIST-BEGIN/END lines) and exit,
 //                                 before anything starts: the launcher's
 //                                 Patches page, where no patch files exist.
+//   PS3_MP_MODE=<mode>            with "Offline Multiplayer (experimental)" on:
+//                                 the mode Quick Play starts: trial1 (default),
+//                                 trial2, favor4, favor8, team4, team8, ctf.
+//   PS3_MP_MAP=<n>|cycle          the map of the first match: 1 = the first of
+//                                 the mode's list, 2 = the second, ...; cycle
+//                                 (default) = the game's own shuffled order.
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -150,6 +156,75 @@ extern "C" int ascension_patch_list_main(void)
     return 0;
 }
 
+// Offline Multiplayer: the launcher's choice of mode and map, written once into
+// the three words the patch reads (patches-rpcs3/ascension-1.00.yml, "Offline
+// Multiplayer (experimental)"): mode 0x819960, map 0x819964, shuffle 0x819968.
+// They sit in alignment padding of the executable's data (zero on disc, used by
+// nothing else) and are written here, after the patch table and before the
+// game's first instruction; nothing changes them while the game runs. With the
+// patch off nothing is written (the table has put the disc's zeros back).
+namespace {
+struct mp_mode_row { const char* key; uint32_t mode; uint32_t maps; const char* name; };
+// mode = the game's own index (GameModes.bin); maps = levels in its built-in cycle
+const mp_mode_row k_mp_modes[] = {
+    { "trial1", 9, 3, "Trial of the Gods, 1 player" },
+    { "trial2", 8, 3, "Trial of the Gods, 2 players co-op" },
+    { "favor4", 4, 4, "Favor of the Gods, 4 players" },
+    { "favor8", 5, 4, "Favor of the Gods, 8 players" },
+    { "team4",  6, 4, "Team Favor of the Gods, 2v2" },
+    { "team8",  7, 4, "Team Favor of the Gods, 4v4" },
+    { "ctf",    3, 4, "Capture the Flag, 4v4" },
+};
+void mp_put32(uint32_t addr, uint32_t v)
+{
+    const uint8_t b[4] = { (uint8_t)(v >> 24), (uint8_t)(v >> 16), (uint8_t)(v >> 8), (uint8_t)v };
+    memcpy(vm_base + addr, b, 4);
+}
+// From the OS environment, as PS3_PATCHES is read (no getenv cache this early).
+std::string mp_env(const char* name)
+{
+    std::string out;
+#ifdef _WIN32
+    const DWORD n = GetEnvironmentVariableA(name, nullptr, 0);
+    if (n) { out.resize(n); out.resize(GetEnvironmentVariableA(name, &out[0], n)); }
+#else
+    const char* e = getenv(name);
+    if (e) out = e;
+#endif
+    while (!out.empty() && (out.back() == ' ' || out.back() == '\t')) out.pop_back();
+    while (!out.empty() && (out[0] == ' ' || out[0] == '\t')) out.erase(0, 1);
+    return out;
+}
+void mp_choice_apply()
+{
+    if (!ascension_patch_on("Offline Multiplayer (experimental)")) return;
+    const std::string mode = mp_env("PS3_MP_MODE"), map = mp_env("PS3_MP_MAP");
+    const mp_mode_row* row = &k_mp_modes[0];
+    if (!mode.empty()) {
+        const mp_mode_row* found = nullptr;
+        for (const mp_mode_row& r : k_mp_modes)
+            if (mode == r.key) found = &r;
+        if (found) row = found;
+        else printf("[mp] unknown PS3_MP_MODE \"%s\": %s is used\n", mode.c_str(), row->key);
+    }
+    // map: 1..maps = that level of the mode's list, kept in its data order;
+    // anything else = the game's own shuffled cycle from its first level
+    uint32_t pick = 0;
+    if (!map.empty() && map != "cycle") {
+        char* end = nullptr;
+        const long v = strtol(map.c_str(), &end, 10);
+        if (end != map.c_str() && *end == 0 && v >= 1 && v <= (long)row->maps) pick = (uint32_t)v;
+        else printf("[mp] PS3_MP_MAP \"%s\" is not 1..%u or cycle: cycle is used\n", map.c_str(), row->maps);
+    }
+    mp_put32(0x819960, row->mode);
+    mp_put32(0x819964, pick ? pick - 1 : 0);
+    mp_put32(0x819968, pick ? 0x100 : 1);
+    if (pick) printf("[mp] Quick Play: %s (mode %u), first map %u of %u, list not shuffled\n", row->name, row->mode, pick, row->maps);
+    else printf("[mp] Quick Play: %s (mode %u), maps in the game's shuffled order\n", row->name, row->mode);
+    fflush(stdout);
+}
+} // namespace
+
 // boot_main.cpp, right after ppu_load_elf: the switches into guest memory.
 extern "C" void ascension_after_load(void)
 {
@@ -157,7 +232,8 @@ extern "C" void ascension_after_load(void)
     const bool* on = patch_state();
     std::string list_on, list_off;
     // The patches that are off first, then the ones that are on (each in table
-    // order): where two patches write the same data bytes, a patch that is on always wins over one that is
+    // order): where two patches write the same data bytes (the Offline
+    // Multiplayer mode word), a patch that is on always wins over one that is
     // off, and of two that are on the later one. Code words are never shared
     // (rpcs3_patch.py refuses that), so for them the order does not matter.
     for (int pass = 0; pass < 2; pass++)
@@ -178,4 +254,5 @@ extern "C" void ascension_after_load(void)
     std::string env;
     printf("[patches] on: %s; off: %s%s\n", list_on.empty() ? "none" : list_on.c_str(),
            list_off.empty() ? "none" : list_off.c_str(), patches_env(env) ? "" : " (build defaults)");
+    mp_choice_apply();
 }

@@ -34,6 +34,7 @@ typedef int http_socket_t;
 #define http_closesocket close
 #endif
 #include "host_socket_send.h"
+#include "mpnet.h"
 
 /* Guest-EA marshalling: the generic HLE adapter passes PPC r3.. verbatim, so
  * pointer arguments are guest effective addresses, not host pointers. Translate
@@ -486,15 +487,6 @@ s32 cellHttpSendRequest(CellHttpTransId transId, const void* buf, u32 size,
     /* Close any previously open socket (re-send scenario) */
     http_close_slot_socket(t);
 
-    /* Public source release: offline only. No request ever leaves this PC;
-     * the title sees the same error as a console with no network. Set
-     * PS3_HTTP_ALLOW_NETWORK at build time to restore upstream ps3recomp's
-     * real HTTP client. */
-#ifndef PS3_HTTP_ALLOW_NETWORK
-    printf("[cellHttp]   offline build: request not sent\n");
-    return CELL_HTTP_ERROR_CONNECTION_FAILED;
-#endif
-
     /* ---- Resolve hostname ---- */
     char port_str[8];
     snprintf(port_str, sizeof(port_str), "%u", t->port);
@@ -506,6 +498,11 @@ s32 cellHttpSendRequest(CellHttpTransId transId, const void* buf, u32 size,
     hints.ai_protocol = IPPROTO_TCP;
 
     struct addrinfo* result = NULL;
+    if (mpnet_on() && !mpnet_name_allowed(t->hostname)) {
+        mpnet_log("blocked http %s %s (host %s not allowed)", t->method, t->url, t->hostname);
+        if (sent) vm_write32((u32)(uintptr_t)sent, (u32)0);
+        return CELL_HTTP_ERROR_CONNECTION_FAILED;
+    }
     int gai = getaddrinfo(t->hostname, port_str, &hints, &result);
     if (gai != 0 || !result) {
         printf("[cellHttp]   getaddrinfo failed for '%s': %d\n", t->hostname, gai);

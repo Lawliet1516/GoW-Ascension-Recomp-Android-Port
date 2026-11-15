@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include "../../runtime/ppu/ppu_memory.h"   /* vm_write*: guest EA -> host, byte-swapped */
 #include "np_psnr.h"
+#include "mpnet.h"
 #include "../system/cellSysutil.h"
 #include "../filesystem/edat.h"
 
@@ -61,6 +62,7 @@ s32 sceNpInit(u32 poolSize, void* poolPtr)
 
     printf("[sceNp] Init(poolSize=%u, username=\"%s\")\n",
            poolSize, np_psnr_online_id());
+    mpnet_init();
 
     if (s_np_initialized)
         return SCE_NP_ERROR_ALREADY_INITIALIZED;
@@ -236,7 +238,7 @@ s32 sceNpManagerGetStatus(s32* status)
      * writes to whatever host address shares that number. Same trap as
      * cellGcmSys had. Tokyo Jungle calls this during its online init. */
     /* Signed in when there is a psnr server to be signed in to. */
-    s32 st = np_psnr_enabled() ? SCE_NP_MANAGER_STATUS_ONLINE : SCE_NP_MANAGER_STATUS_OFFLINE;
+    s32 st = (np_psnr_enabled() || mpnet_on()) ? SCE_NP_MANAGER_STATUS_ONLINE : SCE_NP_MANAGER_STATUS_OFFLINE;
     vm_write32((uint32_t)(uintptr_t)status, (uint32_t)st);
     { static s32 last = -2;
       if (st != last) printf("[sceNp] ManagerGetStatus() -> %s\n", st < 0 ? "OFFLINE" : "ONLINE");
@@ -253,7 +255,7 @@ s32 sceNpManagerRegisterCallback(SceNpManagerCallback callback, void* arg)
     printf("[sceNp] ManagerRegisterCallback()\n");
     /* Online: tell the title it is signed in, as the console does once the
      * manager reaches ONLINE. Delivered on its next cellSysutilCheckCallback. */
-    if (np_psnr_enabled() && callback) {
+    if ((np_psnr_enabled() || mpnet_on()) && callback) {
         const u64 args[8] = { (u64)(u32)SCE_NP_MANAGER_STATUS_ONLINE, 0,
                               (u64)(u32)(uintptr_t)arg, 0, 0, 0, 0, 0 };
         cellSysutilQueueGuestCallbackArgs((u32)(uintptr_t)callback, args);
@@ -343,4 +345,79 @@ s32 sceNpDrmIsAvailable(const u8* k_licensee, const char* drm_path)
 s32 sceNpDrmIsAvailable2(const u8* k_licensee, const char* drm_path)
 {
     return np_drm_is_available(k_licensee, drm_path);
+}
+/* ---------------------------------------------------------------------------
+ * Tickets (mpnet). The game asks RequestTicket2, waits for the manager event
+ * GOT_TICKET (0xFF, result = size), then reads the account id with
+ * GetTicketParam(4) and later copies the raw ticket into its SAM login
+ * (GetTicket). The ticket is our community server's own format (/ticket).
+ * -----------------------------------------------------------------------*/
+
+#define NP_MANAGER_EVENT_GOT_TICKET 0xFF
+
+s32 sceNpManagerRequestTicket2(const SceNpId* npId, const void* version, const char* serviceId,
+                               const void* cookie, u32 cookieSize, const char* entitlementId, u32 consumedCount)
+{
+    (void)npId; (void)version; (void)cookie; (void)cookieSize; (void)entitlementId; (void)consumedCount;
+    if (!s_np_initialized) return SCE_NP_ERROR_NOT_INITIALIZED;
+    const char* sid = serviceId ? GUEST_PTR(serviceId, const char*) : "";
+    if (!mpnet_on()) {
+        printf("[sceNp] ManagerRequestTicket2(service=\"%s\") -> offline, no ticket\n", sid);
+        return CELL_OK;
+    }
+    const unsigned char* t; uint64_t acct;
+    int n = mpnet_ticket(&t, &acct);
+    printf("[sceNp] ManagerRequestTicket2(service=\"%s\") -> %d bytes, account %llu\n", sid, n,
+           (unsigned long long)acct);
+    if (s_npmgr_cb && n > 0) {
+        const u64 args[8] = { (u64)(u32)NP_MANAGER_EVENT_GOT_TICKET, (u64)(u32)n,
+                              (u64)(u32)(uintptr_t)s_npmgr_cb_arg, 0, 0, 0, 0, 0 };
+        cellSysutilQueueGuestCallbackArgs((u32)(uintptr_t)s_npmgr_cb, args);
+    }
+    return CELL_OK;
+}
+
+s32 sceNpManagerRequestTicket(const SceNpId* npId, const char* serviceId, const void* cookie,
+                              u32 cookieSize, const char* entitlementId, u32 consumedCount)
+{
+    return sceNpManagerRequestTicket2(npId, NULL, serviceId, cookie, cookieSize, entitlementId, consumedCount);
+}
+
+s32 sceNpManagerGetTicket(void* buffer, u32* bufferSize)
+{
+    if (!s_np_initialized) return SCE_NP_ERROR_NOT_INITIALIZED;
+    if (!bufferSize) return SCE_NP_ERROR_INVALID_ARGUMENT;
+    const unsigned char* t = NULL; uint64_t acct;
+    int n = mpnet_on() ? mpnet_ticket(&t, &acct) : 0;
+    u32 sz_ea = (u32)(uintptr_t)bufferSize;
+    if (n <= 0) { vm_write32(sz_ea, 0); return (s32)0x8002A10Bu; /* ticket unavailable (best guess) */ }
+    u32 cap = vm_read32(sz_ea);
+    if (buffer) {
+        if (cap < (u32)n) return (s32)0x8002A002u;   /* insufficient buffer (best guess) */
+        memcpy(vm_ptr8((u32)(uintptr_t)buffer), t, (size_t)n);
+    }
+    vm_write32(sz_ea, (u32)n);
+    printf("[sceNp] ManagerGetTicket(cap=%u) -> %d bytes\n", cap, n);
+    return CELL_OK;
+}
+
+/* SceNpTicketParam is a 256-byte union; ids: 0 serial, 1 issuer, 2 issued, 3 expire, 4 subject account
+ * id (u64), 5 subject online id, 6 region, 7 domain, 8 service id, 9 status, 10 duration, 11 DOB. */
+s32 sceNpManagerGetTicketParam(s32 paramId, void* param)
+{
+    if (!s_np_initialized) return SCE_NP_ERROR_NOT_INITIALIZED;
+    if (!param) return SCE_NP_ERROR_INVALID_ARGUMENT;
+    const unsigned char* t; uint64_t acct = 0;
+    if (mpnet_on()) mpnet_ticket(&t, &acct);
+    u32 p = (u32)(uintptr_t)param;
+    memset(vm_ptr8(p), 0, 256);
+    switch (paramId) {
+        case 4: vm_write32(p, (u32)(acct >> 32)); vm_write32(p + 4, (u32)acct); break;
+        case 5: strncpy((char*)vm_ptr8(p), np_psnr_online_id(), 16); break;
+        case 6: memcpy(vm_ptr8(p), "us", 2); break;
+        case 7: memcpy(vm_ptr8(p), "un", 2); break;
+        default: break;
+    }
+    printf("[sceNp] ManagerGetTicketParam(%d)%s\n", paramId, paramId == 4 ? " -> account id" : "");
+    return CELL_OK;
 }

@@ -1,6 +1,7 @@
 """The disc, mods, saves and environment the game starts with."""
 
 import json
+import re
 import os
 import shutil
 import struct
@@ -8,8 +9,8 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from .config import (CONFIG_DIR, FPS_LIMIT, GAME_EXE, GAME_ID, GAME_IDS, HERE, KNOWN_SWITCHES, LANGUAGES, LANGUAGES_US, MAC,
-                     ROOT, SWITCHES, US_ID, fps_limit, WINDOWS, asset,
+from .config import (CONFIG_DIR, FPS_LIMIT, GAME_EXE, GAME_ID, GAME_IDS, HERE, KNOWN_SWITCHES, LANGUAGES, LANGUAGES_US, MAC, MP_MODES,
+                     ROOT, SWITCHES, US_ID, fps_limit, mp_map_choices, WINDOWS, asset,
                      INSTALL, SHARED_CONFIG_FILE, VERSION)
 from .i18n import current, tr
 
@@ -19,6 +20,11 @@ NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 def save_dir():
     return ROOT / 'gamedata' / 'dev_hdd0' / 'home' / '00000001' / 'savedata'
 
+
+def mp_profile_dir():
+    """The multiplayer profile (Offline Multiplayer patch): the game's online
+    storage (TUS), kept in files by the runtime beside the saves."""
+    return ROOT / 'gamedata' / 'dev_hdd0' / 'home' / '00000001' / 'tus'
 
 
 _switch_cache = {}
@@ -411,6 +417,21 @@ def compose_mods(s, log=lambda m: None):
         return _compose_mods(s, log)
 
 
+GENERATED_ONLINE_DIR = CONFIG_DIR / 'generated-online'
+# Mods that may stay on online: MEASURED 2026-11-13 not to change the game's data hash (the matchmaking key):
+# skip-intro (empties /INTRO/BOOT_*.TXT; run n2-us-lobby-20261113-233752, US disc: F8C0B979 = the disc's).
+ONLINE_SAFE_MODS = {'@skip-intro'}
+
+
+def compose_online_mods(s, log=lambda m: None):
+    """Online play loads no mods (every player must have the same data: it is in the matchmaking key), except the
+    1.04 sound mix and the ONLINE_SAFE_MODS (2026-11-13, MEASURED): with only MASTER_MIXER.GMX or the intro list
+    changed the game's data hash stays the disc's (US F8C0B979), so players with and without them still meet.
+    Built in its own folder, so switching online on and off does not rebuild the offline mods' archive."""
+    safe = [m for m in enabled_mod_list(s) if m['id'] in ONLINE_SAFE_MODS]
+    with MODS_LOCK:
+        return _compose_mods(s, log, mods=safe, out_dir=GENERATED_ONLINE_DIR)
+
 
 def prebuild_mods(s):
     """The mods' archives built ahead of PLAY, when the disc is there."""
@@ -478,10 +499,21 @@ def padmap_env(padmap):
     return ';'.join(f'{c}={b}' for c, b in padmap.items())
 
 
+def online_on(s):
+    """Community online multiplayer is switched on (Online page)."""
+    return s.get('online') == '1'
+
 
 def play_exe(s):
-    """The executable to start: game_exe (or this install's own build)."""
-    return installed_exe(s['game_exe'])
+    """The executable to start: the online build while online is on and that file exists, else game_exe."""
+    exe = s.get('online_exe', '')
+    if online_on(s) and exe and Path(exe).is_file() and not port_dlls_missing(exe):
+        return exe
+    base = installed_exe(s['game_exe'])
+    beside = Path(base).with_name('AscensionRecomp.online.exe')   # the tester package puts it there
+    if online_on(s) and beside.is_file():
+        return str(beside)
+    return base
 
 
 def installed_exe(exe):
@@ -495,6 +527,188 @@ def installed_exe(exe):
         return str(own)
     return exe
 
+
+
+# ---- LAN play (2026-11-15) ----------------------------------------------------------------------------------
+# A player can host the community server on their own PC for the players on the same network: the launcher starts
+# it with its own Python (nothing to install), and every launcher on the network finds it by a UDP broadcast
+# ("GOWA?1" to port 36104; the server answers with its name and address, server gowa_server.LanBeacon).
+LAN_DISCOVERY_PORT = 36104
+_lan_server = {'proc': None, 'address': ''}
+
+
+def server_dir():
+    """The community server's code: ascension\\server in a player package, host\\mpnet\\server in the source tree."""
+    for d in (ROOT / 'server', ROOT / 'host' / 'mpnet' / 'server'):
+        if (d / 'gowa_server.py').is_file():
+            return d
+    return None
+
+
+def lan_ip():
+    """This PC's address on its home network (the interface a LAN packet leaves from; a UDP connect sends nothing)."""
+    import socket
+    for probe in ('192.168.255.255', '10.255.255.255', '172.31.255.255'):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect((probe, 9))
+            ip = s.getsockname()[0]
+            if ip.startswith(('192.168.', '10.')) or any(ip.startswith('172.%d.' % n) for n in range(16, 32)):
+                return ip
+        except OSError:
+            pass
+        finally:
+            s.close()
+    return ''
+
+
+def lan_discover(timeout=1.0):
+    """The LAN servers that answer a broadcast within `timeout` seconds: [{'name', 'address', 'players'}]."""
+    import socket
+    found = {}
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.settimeout(0.2)
+        for dest in ('255.255.255.255', '127.0.0.1'):
+            try:
+                s.sendto(b'GOWA?1', (dest, LAN_DISCOVERY_PORT))
+            except OSError:
+                pass
+        end = time.time() + timeout
+        while time.time() < end:
+            try:
+                data, addr = s.recvfrom(2048)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            try:
+                r = json.loads(data.decode('utf-8', 'replace'))
+            except ValueError:
+                continue
+            if r.get('gowa') == 1 and r.get('address'):
+                found[str(r['address'])[:64]] = {'name': str(r.get('name', 'LAN server'))[:40],
+                                                 'address': str(r['address'])[:64], 'players': int(r.get('players') or 0)}
+    finally:
+        s.close()
+    return list(found.values())
+
+
+def lan_server_running():
+    p = _lan_server['proc']
+    return p is not None and p.poll() is None
+
+
+def start_lan_server(name):
+    """Start the community server on this PC's LAN address. Returns (address, None) or (None, reason)."""
+    if lan_server_running():
+        return _lan_server['address'], None
+    d = server_dir()
+    if d is None:
+        return None, tr('the server files are not in this install (ascension\\server)')
+    ip = lan_ip()
+    if not ip:
+        return None, tr('no home-network address found on this PC')
+    import sys
+    py = Path(sys.executable)
+    if py.name.lower() == 'pythonw.exe' and (py.parent / 'python.exe').is_file():
+        py = py.parent / 'python.exe'
+    data = ROOT / 'gamedata' / 'lan-server'
+    data.mkdir(parents=True, exist_ok=True)
+    log = ROOT / 'build' / 'logs' / 'lan-server.log'
+    log.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [str(py), '-I', str(d / 'gowa_server.py'), '--host', ip, '--lan', '--name', (name or 'LAN server')[:40],
+           '--data', str(data), '--log', str(log)]
+    try:
+        _lan_server['proc'] = subprocess.Popen(cmd, cwd=str(d), creationflags=NO_WINDOW,
+                                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e:
+        return None, str(e)
+    time.sleep(1.5)
+    if not lan_server_running():
+        return None, tr('the server stopped at once (see build\\logs\\lan-server.log; another program may use port 36101)')
+    _lan_server['address'] = ip
+    return ip, None
+
+
+def stop_lan_server():
+    p = _lan_server['proc']
+    if p is not None and p.poll() is None:
+        p.terminate()
+        try:
+            p.wait(5)
+        except Exception:
+            p.kill()
+    _lan_server['proc'] = None
+    _lan_server['address'] = ''
+
+
+import atexit
+atexit.register(lambda: stop_lan_server())   # the LAN server ends with the launcher
+
+
+def split_invite(text):
+    """A match code as typed or pasted: 'ABC123' -> ('ABC123', '') ; 'ABC123@203.0.113.25' -> ('ABC123', '203.0.113.25')
+    (2026-11-15: Copy code copies the server with the code, so a friend lands on the same server)."""
+    raw = (text or '').strip()
+    code, _, host = raw.partition('@')
+    code = ''.join(c for c in code.upper() if c.isascii() and c.isalnum())[:12]
+    host = host.strip()
+    if host and not re.match(r'^[A-Za-z0-9.-]{1,253}(:\d{1,5})?$', host):
+        host = ''
+    return code, host
+
+
+def online_environment(s, env):
+    """The online settings as the online runtime reads them (kit mpnet.c / sysNet.c). Online, every player must
+    load the same game data (it is part of the matchmaking key): no mods, so a skip-intro archive built by one
+    launcher version never splits players from another."""
+    env['PS3_MPNET'] = '1'
+    env['PS3_NET_ONLINE'] = '1'
+    server = (s.get('online_server') or '').strip()
+    _code, invite_host = split_invite(s.get('online_party'))
+    if invite_host:        # a code copied with its server ("ABC123@host") plays on that server
+        server = invite_host
+    if server:
+        env['PS3_MPNET_SERVER'] = server
+    # HTTPS sign-in (2026-11-14): the known community servers answer the game's requests over HTTPS on their
+    # <ip-with-dashes>.sslip.io certificate (Caddy); other servers (a PC at home) stay on plain HTTP.
+    from .config import KNOWN_SERVERS
+    host = server.split(':')[0]
+    if host and host in {a for _n, a, _r in KNOWN_SERVERS}:
+        env['PS3_MPNET_HTTPS'] = host.replace('.', '-') + '.sslip.io'
+    else:
+        env.pop('PS3_MPNET_HTTPS', None)
+    name = (s.get('online_name') or '').strip()
+    if name:
+        env['PS3_NP_ONLINE_ID'] = name[:16]
+    port = (s.get('online_port') or '3658').strip()
+    env['PS3_NET_P2P_PORT'] = port if port.isdigit() else '3658'
+    party = split_invite(s.get('online_party'))[0]
+    if party:
+        env['PS3_MPNET_PARTY'] = party
+    else:
+        env.pop('PS3_MPNET_PARTY', None)
+    env.pop('PS3_MODS', None)
+    env['PS3_MPNET_TOKEN_FILE'] = str(token_file())
+
+
+def token_file():
+    """The player's sign-in key for the community server, always in one place (2026-11-13): gamedata\\mpnet-token.txt.
+    Without this the game kept it beside wherever /dev_hdd0 pointed, so changing a game-data setting made a new key
+    and the server then refused the player's own name. A key found in an older place is moved here first."""
+    dst = ROOT / 'gamedata' / 'mpnet-token.txt'
+    if not dst.exists():
+        for old in (ROOT / 'mpnet-token.txt', ROOT.parent / 'work' / 'mpnet-token.txt'):
+            try:
+                if old.is_file() and old.stat().st_size >= 32:
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(old, dst)
+                    break
+            except OSError:
+                pass
+    return dst
 
 
 def game_environment(s, switches=None):
@@ -559,6 +773,17 @@ def game_environment(s, switches=None):
     if 'LD_UBER' in switches and s.get('uber_shaders', '0') == '1':
         for key in ('LD_UBER', 'LD_UBER_BUDGET', 'LD_UBER_FAST', 'LD_UBER_AFTERLOAD', 'LD_UBER_KAUTO', 'LD_UBER_VS'):   # +uber6: after-load stand-ins, vertex ubershader (host/w2i check 2)
             env.setdefault(key, '1')
+    # Ambient occlusion (2026-11-15, opt-in): soft contact shadows added at the end of the scene's 3D pass.
+    if 'LD_AO' in switches and s.get('ambient_occlusion', '0') == '1':
+        env.setdefault('LD_AO', '1')
+    # Offline Multiplayer: the mode Quick Play starts and the map of its first match
+    # (the game reads them only with that patch on).
+    if 'PS3_MP_MODE' in switches:
+        mode = s.get('mp_mode', 'trial1')
+        mode = mode if mode in dict(MP_MODES) else 'trial1'
+        mp_map = s.get('mp_map', 'cycle')
+        env.setdefault('PS3_MP_MODE', mode)
+        env.setdefault('PS3_MP_MAP', mp_map if mp_map in dict(mp_map_choices(mode)) else 'cycle')
     # Testing only: the game limits itself to that many cores (placement plans on them).
     if 'PS3_CPU_LIMIT' in switches and s.get('cpu_limit', '0') not in ('', '0'):
         env.setdefault('PS3_CPU_LIMIT', s['cpu_limit'])
@@ -632,6 +857,11 @@ def game_environment(s, switches=None):
             k, v = item.split('=', 1)
             if k.strip():
                 env[k.strip()] = v.strip()
+    if online_on(s):
+        online_environment(s, env)   # after the extra variables: the Online page wins over old typed lines
+        online = compose_online_mods(s)   # online: no mods, except the 1.04 sound mix (same data hash)
+        if online:
+            env['PS3_MODS'] = ';'.join(online)
     return env
 
 
@@ -686,10 +916,34 @@ def tree_signature(folder):
     return sorted(out)
 
 
+def backup_mp_profile():
+    """A copy of the multiplayer profile folder in gamedata/mp-profile-backups,
+    as backup_saves does for the saves (kept apart: a save backup is restored
+    into the savedata folder as it is)."""
+    src = mp_profile_dir()
+    if not src.is_dir() or not any(src.iterdir()):
+        return None
+    folder = ROOT / 'gamedata' / 'mp-profile-backups'
+    backups = sorted(folder.iterdir()) if folder.is_dir() else []
+    if backups and tree_signature(backups[-1]) == tree_signature(src):
+        return backups[-1]
+    dst = folder / time.strftime('%Y%m%d-%H%M%S')
+    if dst.exists():
+        return dst
+    shutil.copytree(src, dst)
+    for old in sorted(folder.iterdir())[:-20]:      # keep the last twenty
+        shutil.rmtree(old, ignore_errors=True)
+    return dst
+
 
 def backup_saves():
     """A copy of the saves, unless the newest backup already has them as they
-    are: starting the game ten times without playing keeps the older ones."""
+    are: starting the game ten times without playing keeps the older ones.
+    The multiplayer profile is copied too (backup_mp_profile)."""
+    try:
+        backup_mp_profile()
+    except OSError:
+        pass                                        # the saves still get their copy
     src = save_dir()
     if not src.is_dir() or not any(src.iterdir()):
         return None
@@ -708,9 +962,9 @@ def backup_saves():
 
 
 def saves_signature():
-    """The saves, for watch_saves."""
-    d = save_dir()
-    return tree_signature(d) if d.is_dir() else None
+    """The saves and the multiplayer profile, for watch_saves."""
+    sig = [tree_signature(d) if d.is_dir() else None for d in (save_dir(), mp_profile_dir())]
+    return None if sig == [None, None] else sig
 
 
 def watch_saves(process, stable_s=10, step_s=5):
@@ -933,7 +1187,7 @@ def other_install_roots(s=None):
     except (OSError, ValueError):
         pass
     for d in settings:
-        for key in ('game_exe', 'eboot', 'mods_dir'):
+        for key in ('game_exe', 'online_exe', 'eboot', 'mods_dir'):
             v = d.get(key) if isinstance(d, dict) else None
             if isinstance(v, str) and v:
                 add(_root_of(v))
@@ -1304,8 +1558,22 @@ def missing(s, split_ok=False):
     if gone:
         names = ', '.join(str(p) for p in gone[:3]) + (' …' if len(gone) > 3 else '')
         out.append(tr('game files ({files}): your copy of the game is incomplete, copy or extract it again', files=names))
+    if online_on(s):
+        edat = online_pass_file(s)
+        if edat is not None and not edat.is_file():
+            out.append(tr('your Online Pass for online play ({path}): the game checks it itself and, without it, '
+                          'waits on a black screen for the PlayStation Store. Put your own INDEX.EDAT there (make the '
+                          'folders if needed), or switch online off on the Online page to play offline', path=edat))
     return out
 
+
+def online_pass_file(s):
+    """Where the game reads the Online Pass (2026-11-13: a tester's pass in another folder left the game on a black
+    store screen with no message). Only for installs whose /dev_hdd0 is ./gamedata (the launcher's own game setup,
+    macOS); None elsewhere (development setups keep /dev_hdd0 where run.ps1 has it)."""
+    if not (MAC or s.get('port_hdd') == '1'):
+        return None
+    return (ROOT / 'gamedata' / 'dev_hdd0' / 'game' / title_id(s) / 'USRDIR' / 'DLC' / 'DLC0' / 'INDEX.EDAT')
 
 
 def prepare_game(s, status=lambda m: None):
@@ -1445,6 +1713,46 @@ class WatchedGame:
             self.proc.kill()
 
 
+def discord_helper(s):
+    """The Discord presence helper (host\\mpnet\\discord: gowa_discord.exe + discord_partner_sdk.dll), or None."""
+    exe = Path(s.get('online_discord_exe') or (ROOT / 'discord' / 'gowa_discord.exe'))
+    return exe if exe.is_file() else None
+
+
+def start_discord_helper(s, game_pid):
+    """Online + "Show on Discord": shows what the player does on their Discord profile while the game runs (it
+    ends with the game). Rich Presence goes through the Discord app on this PC; no sign-in, nothing if it is closed."""
+    exe = discord_helper(s)
+    name = (s.get('online_name') or '').strip()
+    server = (s.get('online_server') or '').strip()
+    if not (online_on(s) and s.get('online_discord') == '1' and exe and name and server):
+        return None
+    try:
+        return subprocess.Popen([str(exe), '--server', server, '--name', name[:16], '--pid', str(game_pid)],
+                                cwd=str(exe.parent), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    except OSError:
+        return None
+
+
+def take_discord_join(s):
+    """A friend's Join from Discord (the helper wrote "server|code"): returns (server, code) once, else None."""
+    exe = discord_helper(s)
+    f = (exe.parent / 'discord-join.txt') if exe else None
+    if not f or not f.is_file():
+        return None
+    try:
+        text = f.read_text(encoding='utf-8', errors='replace').strip()
+        f.unlink()
+    except OSError:
+        return None
+    server, _, code = text.partition('|')
+    code = ''.join(c for c in code.upper() if c.isascii() and c.isalnum())[:12]
+    server = server.strip()[:100]
+    if not server or not code or any(c.isspace() for c in server):
+        return None
+    return server, code
+
 
 def start_game(s, env, log_path, parent=None):
     """Start the game; with `parent` (a window handle) it renders inside that
@@ -1458,6 +1766,7 @@ def start_game(s, env, log_path, parent=None):
         env = {**env, 'PS3_PARENT_HWND': str(parent)}
     try:
         game = WatchedGame(s, env, log_path, log)
+        start_discord_helper(s, game.pid)
         return game, log
     except BaseException:
         log.close()
