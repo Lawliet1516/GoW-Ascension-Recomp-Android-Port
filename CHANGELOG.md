@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.33 (beta), 2026-11-15
+
+### Online: cheats no longer block online play
+With any cheat patch ticked, the game turned online off and only showed "signed out of PlayStation Network"
+(80010001). Now an online run leaves cheats and other gameplay patches out by itself (only Unlock FPS and the
+visual Disable ... patches stay on, the ones the game allows online), and the launcher says how many it left out.
+Your ticks stay as they are: single player still uses all of them.
+
+- Launcher-only update: the game executable is the same as 0.1.32.
+
 ## 0.1.32 (beta), 2026-11-15
 
 ### Online multiplayer is back in the port

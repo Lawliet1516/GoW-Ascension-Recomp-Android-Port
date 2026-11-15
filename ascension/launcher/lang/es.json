@@ -558,5 +558,12 @@
   "Looks for your saves in other folders of the port (an older version you extracted somewhere else, Downloads, the Desktop) and copies them here. Nothing is deleted.": "Busca tus partidas en otras carpetas del port (una versión anterior que extrajiste en otro sitio, Descargas, el Escritorio) y las copia aquí. No se borra nada.",
   "Close the game first.": "Cierra el juego primero.",
   "Saves from your old folder are copied in": "Se copian las partidas de tu carpeta antigua",
-  "Smoother glow at high resolutions": "Resplandor más suave en resoluciones altas"
+  "Smoother glow at high resolutions": "Resplandor más suave en resoluciones altas",
+  "Online multiplayer (community servers, LAN)": "Multijugador en línea (servidores de la comunidad, LAN)",
+  "Ambient occlusion and 5.1 surround sound": "Oclusión ambiental y sonido envolvente 5.1",
+  "Lighting": "Iluminación",
+  "Ambient occlusion": "Oclusión ambiental",
+  "Adds soft contact shadows in corners, under ledges and where characters stand. Not part of the PS3 game. Uses some GPU time; turn it off if something looks wrong.": "Añade sombras de contacto suaves en esquinas, bajo salientes y donde se apoyan los personajes. No forma parte del juego de PS3. Usa algo de GPU; desactívala si algo se ve mal.",
+  "Online: cheats are left out automatically": "En línea: los trucos se quitan automáticamente",
+  "Game running online. Cheats are off online ({n} patches left out; they stay on for single player).": "Juego en línea. Los trucos están desactivados en línea ({n} parches quitados; siguen activos en un jugador)."
 }

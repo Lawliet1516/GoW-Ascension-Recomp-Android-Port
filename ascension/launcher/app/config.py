@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-VERSION = '0.1.31'   # the port release (BilalReloaded); was the launcher's own 0.2
+VERSION = '0.1.33'   # the port release (BilalReloaded); was the launcher's own 0.2
 APP_NAME = 'God of War: Ascension'
 GAME_ID = 'BCES01741'      # the European disc the port is built from
 US_ID = 'BCUS98232'        # the US disc: the same program 16 bytes on (app/us_eboot.py converts its EBOOT)
@@ -146,7 +146,7 @@ SHORT_LABELS = {
     'scale_filter': [('linear', 'Smooth'), ('nearest', 'Sharp'), ('fsr', 'FSR 1')],
 }
 # Home's "New in" line: three short items of this release.
-NEWS = ('Smoother glow at high resolutions', 'Fewer shader stutters (NVIDIA, opt-in)')
+NEWS = ('Online: cheats are left out automatically', 'Online multiplayer (community servers, LAN)')
 
 # Video. The renderer: RPCS3's RSX (ps3recomp gpu/, a build with
 # -DASCENSION_RPCS3_RSX=ON) or live draw. On macOS, Vulkan is MoltenVK and

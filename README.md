@@ -25,13 +25,13 @@ anyone can run (no Sony servers): see [Online multiplayer](#online-multiplayer).
 
 ## Download (ready to play)
 
-The [Releases](../../releases/latest) page has **GodOfWarAscension-0.1.32-windows.zip**: extract it anywhere and run the launcher. You still need your own copy of the game. Already playing an older version? Extract it **over your old folder**, or into a new folder and start the launcher once: your saves are copied over.
+The [Releases](../../releases/latest) page has **GodOfWarAscension-0.1.33-windows.zip**: extract it anywhere and run the launcher. You still need your own copy of the game. Already playing an older version? Extract it **over your old folder**, or into a new folder and start the launcher once: your saves are copied over.
 
 The ready-made build includes the hand-written native SPU code, so it is faster in heavy fights than a build made from this source alone.
 
 ## What has been fixed so far
 
-Highlights from 0.1.0 (2026-10-30) to 0.1.32. The full list is in [CHANGELOG.md](CHANGELOG.md).
+Highlights from 0.1.0 (2026-10-30) to 0.1.33. The full list is in [CHANGELOG.md](CHANGELOG.md).
 
 **Speed**
 - More of the game runs as real PC code (SPU jobs rewritten natively): much faster on 4-8 core CPUs (0.1.12, 0.1.22).
