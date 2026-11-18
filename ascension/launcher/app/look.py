@@ -1095,6 +1095,11 @@ class Look:
             self.section(f, tr('Lighting'))
             self.check(f, 'ambient_occlusion', tr('Ambient occlusion'),
                        tr('Adds soft contact shadows in corners, under ledges and where characters stand. Not part of the PS3 game. Uses some GPU time; turn it off if something looks wrong.'), badge=tr('NEW'))
+        if self.has('LD_FULLRES_FX'):   # 2026-11-17: smoother glow (on by default), a switch to turn it off
+            if not self.has('LD_AO'):
+                self.section(f, tr('Lighting'))
+            self.check(f, 'smooth_glow', tr('Smoother glow at high resolutions'),
+                       tr('Makes the glow around fire, magic and bright light smooth instead of dotty when the resolution is above 720p. On by default; it did not lower the frame rate in our tests. On a slow graphics card you can turn it off for a few more frames per second.'))
         if self.has('LD_UBER'):   # host uber5: the ubershader, opt-in (game.game_environment sets its switches)
             self.section(f, tr('Shaders'))
             self.check(f, 'uber_shaders', tr('Fewer shader stutters (NVIDIA, experimental)'),

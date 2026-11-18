@@ -559,6 +559,7 @@
   "Close the game first.": "Cierra el juego primero.",
   "Saves from your old folder are copied in": "Se copian las partidas de tu carpeta antigua",
   "Smoother glow at high resolutions": "Resplandor más suave en resoluciones altas",
+  "Makes the glow around fire, magic and bright light smooth instead of dotty when the resolution is above 720p. On by default; it did not lower the frame rate in our tests. On a slow graphics card you can turn it off for a few more frames per second.": "Hace que el resplandor alrededor del fuego, la magia y las luces intensas se vea suave en lugar de punteado cuando la resolución es mayor que 720p. Activado por defecto; en nuestras pruebas no bajó los fotogramas por segundo. En una tarjeta gráfica lenta puedes desactivarlo para ganar algunos fotogramas por segundo.",
   "Online multiplayer (community servers, LAN)": "Multijugador en línea (servidores de la comunidad, LAN)",
   "Ambient occlusion and 5.1 surround sound": "Oclusión ambiental y sonido envolvente 5.1",
   "Lighting": "Iluminación",
@@ -567,5 +568,7 @@
   "Online: cheats are left out automatically": "En línea: los trucos se quitan automáticamente",
   "Game running online. Cheats are off online ({n} patches left out; they stay on for single player).": "Juego en línea. Los trucos están desactivados en línea ({n} parches quitados; siguen activos en un jugador).",
   "European disc: online you only meet players with the European disc (US-disc players have different multiplayer data).": "Disco europeo: en línea solo juegas con jugadores del disco europeo (los del disco de EE. UU. tienen otros datos multijugador).",
-  "Saves: an older save no longer replaces your progress": "Partidas: una partida más antigua ya no reemplaza tu progreso"
+  "Saves: an older save no longer replaces your progress": "Partidas: una partida más antigua ya no reemplaza tu progreso",
+  "Saves show the real date in the game": "Las partidas muestran la fecha real en el juego",
+  "Offline multiplayer: no freeze with a 1.04 update file": "Multijugador sin conexión: ya no se congela con un archivo de la actualización 1.04"
 }

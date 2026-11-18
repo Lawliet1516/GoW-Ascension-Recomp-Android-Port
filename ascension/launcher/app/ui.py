@@ -2167,11 +2167,8 @@ class Launcher(Look):
                      'on for single player).', n=len(dropped))
         else:
             msg = tr('Game running… the log is in Advanced → Log.')
-        if online_on(self.s) and game_title_id(self.s) == GAME_ID:
-            # 2026-11-15 STATIC: the EU and US discs carry different multiplayer data (maps, object ID order),
-            # so the game puts it in the matchmaking key and never plays an EU-disc player with a US-disc player
-            msg += ' ' + tr('European disc: online you only meet players with the European disc (US-disc players '
-                            'have different multiplayer data).')
+        # 2026-11-18: the old EU-disc-only online note was removed: the game exe's
+        # switch 3 (mpnet.c, func_0032760C) gives EU and US discs the same multiplayer data value since 0.1.35.
         self.refresh_status(msg)
         if WINDOWS and not self.embedded and self.s.get('hide_while_playing') == '1':
             self.root.after(4000, self.hide_for_game, self.process)

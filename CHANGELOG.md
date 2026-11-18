@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.35 (beta), 2026-11-18
+
+### Saves: the real date
+The in-game save list showed dates in 1969 or 1970: the game's clock started at the moment Windows booted. The game
+now gets the real date and time.
+
+### Offline multiplayer: no freeze with a 1.04 update file
+Copies of the game with the official 1.04 update merged in have the update's big TPPS.PSARC in place of the disc's
+tiny one. The 1.00 game read half of it, and the first multiplayer match froze on its first frame. The launcher now
+gives the game the disc's own small file (offline and online), so matches start normally.
+
+### Online
+- European-disc and US-disc players are now matched together (the two discs carried different multiplayer data;
+  the game now uses the US value for both). Not fully tested yet: please tell us how it goes.
+- A wrong or missing Online Pass no longer sends the game to the PlayStation Store, where it spun forever.
+
+### Other
+- New launcher checkbox "Smoother glow at high resolutions" (on by default; turn it off on a slow graphics card).
+- A rare error loop can no longer fill the disk with a log file of many gigabytes.
+
 ## 0.1.34 (beta), 2026-11-16
 
 ### Saves: an older save no longer replaces your progress

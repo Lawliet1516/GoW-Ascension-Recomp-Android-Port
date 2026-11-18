@@ -1,5 +1,6 @@
 """The disc, mods, saves and environment the game starts with."""
 
+import hashlib
 import json
 import re
 import os
@@ -488,7 +489,48 @@ def _compose_mods(s, log, mods=None, out_dir=None):
                 keyf.write_text(key, encoding='utf-8')
         dirs.append(str(out_dir))
     dirs += [str(m['path']) for m in mods]
+    stub = tpps_stub_dir(usrdir, log)
+    if stub:
+        dirs.insert(0, stub)          # first = wins over every mod and the disc
     return dirs
+
+
+TPPS_STUB_DIR = CONFIG_DIR / 'tpps-stub'
+TPPS_STUB_NAME = b'/WAD/PS3_BE/TPPS-STUB.TXT'
+
+
+def tpps_stub_bytes():
+    """The disc's TPPS.PSARC (121 bytes, the same on BCES01741 and BCUS98232): a PSARC whose only file is the empty
+    /WAD/PS3_BE/TPPS-STUB.TXT. Built here, byte for byte equal to the discs' (checked 2026-11-16)."""
+    name = TPPS_STUB_NAME
+    hdr = struct.pack('>4sI4sIIIII', b'PSAR', 0x00010004, b'zlib', 0x60, 30, 2, 0x10000, 2)
+    e0 = bytes(16) + struct.pack('>I', 0) + len(name).to_bytes(5, 'big') + (0x60).to_bytes(5, 'big')
+    e1 = (hashlib.md5(name).digest() + struct.pack('>I', 1) + (0).to_bytes(5, 'big')
+          + (0x60 + len(name)).to_bytes(5, 'big'))
+    return hdr + e0 + e1 + struct.pack('>HH', len(name), 0) + name
+
+
+def tpps_stub_dir(usrdir, log=lambda m: None):
+    """A folder for PS3_MODS with the disc's TPPS.PSARC stub, when the game folder has another TPPS.PSARC.
+    Copies of the game with an official update merged in (1.04 and later) carry the update's 205 MB TPPS.PSARC
+    in place of the disc's stub. The 1.00 program mounts it (it is the last line of ARCHIVES), so its new DCB files
+    and DEPENDENCYGRAPH.IFF replace the disc's, but it cannot apply the update's .WAD.PATCH files: the multiplayer
+    player spawn then builds an object from a type the 1.00 data does not have, calls a NULL function pointer 400
+    times and the match freezes on its first frame (tester log 2026-11-16, reproduced on the US disc with the
+    1.04 TPPS.PSARC). The stub keeps the 1.00 data as the disc has it, offline and online (same data hash)."""
+    try:
+        f = usrdir / 'TPPS.PSARC'
+        if not f.is_file() or f.stat().st_size == 121:
+            return None
+        TPPS_STUB_DIR.mkdir(parents=True, exist_ok=True)
+        out = TPPS_STUB_DIR / 'TPPS.PSARC'
+        data = tpps_stub_bytes()
+        if not (out.is_file() and out.read_bytes() == data):
+            out.write_bytes(data)
+        log(f'TPPS.PSARC from an update ({f.stat().st_size} bytes): the disc stub is used')
+        return str(TPPS_STUB_DIR)
+    except OSError:
+        return None
 
 
 def keymap_env(keymap):
@@ -800,6 +842,10 @@ def game_environment(s, switches=None):
     # Ambient occlusion (2026-11-15, opt-in): soft contact shadows added at the end of the scene's 3D pass.
     if 'LD_AO' in switches and s.get('ambient_occlusion', '0') == '1':
         env.setdefault('LD_AO', '1')
+    # Smoother glow at high resolutions (LD_FULLRES_FX, on in the game by default since 2026-11-14): the switch only
+    # turns it off, for slow graphics cards.
+    if 'LD_FULLRES_FX' in switches and s.get('smooth_glow', '1') == '0':
+        env.setdefault('LD_FULLRES_FX', '0')
     # Offline Multiplayer: the mode Quick Play starts and the map of its first match
     # (the game reads them only with that patch on).
     if 'PS3_MP_MODE' in switches:

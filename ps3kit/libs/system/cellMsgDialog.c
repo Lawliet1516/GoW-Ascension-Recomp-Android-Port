@@ -109,6 +109,26 @@ static int msg_offers_to_abort(const char* msg)
     return 0;
 }
 
+/* Is this the "An Online Pass is required ... Do you want to enter an Online Pass?" prompt? YES opens the
+ * PlayStation Store (sceNpCommerce2), which does not exist here: God of War: Ascension then spun on its
+ * loading logo forever (tester log 2026-11-16: his INDEX.EDAT and .rifkey did not match, "[edat] block 0
+ * hash mismatch", so the game rightly asked). NO backs out of multiplayer instead of hanging. The brand
+ * name stays "Online Pass" in most languages (the Spanish text has it); French and German forms added. */
+static int msg_is_online_pass(const char* msg)
+{
+    static const char* const words[] = { "online pass", "online-pass", "pass en ligne", "pase online", NULL };
+    if (!msg) return 0;
+    for (int w = 0; words[w]; w++) {
+        const size_t n = strlen(words[w]);
+        for (const char* p = msg; *p; p++) {
+            size_t i = 0;
+            while (i < n && p[i] && (char)tolower((unsigned char)p[i]) == words[w][i]) i++;
+            if (i == n) return 1;
+        }
+    }
+    return 0;
+}
+
 s32 cellMsgDialogOpen2(CellMsgDialogType type, const char* msgString,
                         CellMsgDialogCallback callback, void* userdata,
                         void* extParam)
@@ -221,9 +241,13 @@ s32 cellMsgDialogOpen2(CellMsgDialogType type, const char* msgString,
             }
             int auto_no = (forced == 2) ? msg_offers_to_abort(guest_str(msgString)) : 0;
             int no_ = (forced == 2) ? auto_no : forced;
+            const int pass_no = msg_is_online_pass(guest_str(msgString));
+            if (pass_no) no_ = 1;
             result = no_ ? CELL_MSGDIALOG_BUTTON_NO : CELL_MSGDIALOG_BUTTON_YES;
             printf("[cellMsgDialog] Auto-responding: %s%s\n", no_ ? "NO" : "YES",
-                   auto_no ? " (prompt offers to abort)" : "");
+                   pass_no ? " (Online Pass prompt: YES would open the PlayStation Store, which is not there;"
+                             " check that INDEX.EDAT and its .rifkey match)"
+                   : auto_no ? " (prompt offers to abort)" : "");
         } else if (button_type == CELL_MSGDIALOG_TYPE_BUTTON_TYPE_OK) {
             result = CELL_MSGDIALOG_BUTTON_OK;
             printf("[cellMsgDialog] Auto-responding: OK\n");

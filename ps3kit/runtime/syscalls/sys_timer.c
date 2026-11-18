@@ -591,14 +591,17 @@ int64_t sys_time_get_current_time(ppu_context* ctx)
     uint64_t sec, nsec;
 
 #ifdef _WIN32
-    ensure_qpc_init();
-    LARGE_INTEGER now;
-    QueryPerformanceCounter(&now);
-
-    /* Convert QPC to seconds + nanoseconds */
-    sec  = (uint64_t)(now.QuadPart / s_qpc_freq.QuadPart);
-    uint64_t remainder = (uint64_t)(now.QuadPart % s_qpc_freq.QuadPart);
-    nsec = (remainder * 1000000000ULL) / (uint64_t)s_qpc_freq.QuadPart;
+    /* The wall clock (UTC seconds since 1970), as LV2 and RPCS3 return it. This was the
+     * QueryPerformanceCounter, i.e. the time since the PC booted: the game took that for the
+     * date, so a save made in play showed 1969/1970 + the PC's uptime (jefry "03/01/1970",
+     * XORGE "1969" until the next start, 2026-11-16). */
+    FILETIME ft;
+    GetSystemTimePreciseAsFileTime(&ft);
+    uint64_t t100 = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    t100 -= 116444736000000000ULL;            /* 1601 -> 1970, in 100 ns */
+    sec  = t100 / 10000000ULL;
+    nsec = (t100 % 10000000ULL) * 100ULL;
+    { static volatile long s_logged; if (!s_logged) { s_logged = 1; printf("[time] sys_time_get_current_time: %llu (UTC seconds since 1970)\n", (unsigned long long)sec); } }
 #else
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);

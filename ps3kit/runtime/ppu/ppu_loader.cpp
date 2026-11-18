@@ -1353,7 +1353,8 @@ static int vm_null_store_report(uint32_t a, uint32_t v, int width, void* ra)
                                     ? (unsigned)g_active_ctx->thread_id : 0u; } }
     { static long n = 0;
       enum { NW_MAX = 8 };
-      long i = n++;
+      long i = n;
+      if (n <= NW_MAX) n++;                /* saturate: a 32-bit count wraps in a hot loop */
       if (i < NW_MAX)
           fprintf(stderr, "[null-write] guest wrote%d 0x%X to 0x%08X (NULL+0x%X)"
                           " by guest-fn=0x%08X -- DROPPED\n",
@@ -1628,8 +1629,11 @@ static inline void ppu_null_read_report(uint32_t a, int width, void* ra)
     int fi = 0;
     while (fi < s_nfn && s_fn[fi] != fn) fi++;
     if (fi == s_nfn) { if (s_nfn == NR_FN) return; s_fn[fi] = fn; s_nfn++; }
+    /* Stop counting at the cap: a hot loop reads NULL ~100 million times a second, so the 32-bit
+     * (Windows long) count wrapped to negative after ~20 s and every read printed again until it came
+     * back -- a frozen match filled 17.9 GB of log (2026-11-16, 1.04 TPPS.PSARC repro). */
+    if (s_cnt[fi] >= NR_PER) return;
     long s_n = ++s_cnt[fi];
-    if (s_n > NR_PER) return;
     /* A few registers too: in a list walk they hold the head and the node
      * whose link read as 0, without PS3_NULL_READ_STACK's full dump. */
     const ppu_context* c = g_active_ctx;
@@ -2913,7 +2917,7 @@ static void ps3_indirect_call_impl(ppu_context* ctx)
               unsigned ti = (unsigned)ctx->thread_id < NC_T
                             ? (unsigned)ctx->thread_id : 0;
               long s_n = s_nt[ti];
-              s_nt[ti] = s_n + 1;
+              if (s_n <= NC_PER) s_nt[ti] = s_n + 1;   /* saturate: a 32-bit count wraps in a hot loop */
               if (s_n < NC_PER)
                   /* r12 is NOT reliable here: a vtable bctrl loads ctr from
                    * the OPD directly and never writes r12, so it prints stale
@@ -2963,7 +2967,8 @@ static void ps3_indirect_call_impl(ppu_context* ctx)
          * error code. Tokyo Jungle: cellAudioSetNotifyEventQueue(key=0x23A0)
          * "failed" with status 0x23A0 -- the key itself. Say so."*/
         static int n = 0;
-        if (n++ < 400)
+        if (n < 401) n++;                    /* saturate: an int counter wraps in a hot loop and prints again */
+        if (n <= 400)
         { char who[64]; ppu_guest_caller(who, sizeof who);
           if (n <= 400) {
             /* The lifted import thunk leaves the OPD address it loaded in r12,

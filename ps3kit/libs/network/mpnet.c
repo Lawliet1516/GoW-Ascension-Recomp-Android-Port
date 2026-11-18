@@ -86,12 +86,13 @@ int mpnet_flag(int which)
         switch (which) {
             case 1: v = !env1("PS3_MPNET_SSL"); break;            /* SSL wrapper off */
             case 2: v = 1; break;                                 /* TSS plaintext */
+            case 3: v = !env1("PS3_MPNET_REGION_SPLIT"); break;   /* EU + US play together (2026-11-17) */
         }
     }
     if (which > 0 && which < 8 && !said[which]) {
         said[which] = 1;
-        static const char* names[] = { "", "SSL off (0x324798)", "TSS plaintext (0x3319BC)" };
-        if (mpnet_on()) mpnet_log("source patch %d %s: %s", which, which < 3 ? names[which] : "?", v ? "ON" : "off");
+        static const char* names[] = { "", "SSL off (0x324798)", "TSS plaintext (0x3319BC)", "EU data value -> US (0x32760C)" };
+        if (mpnet_on()) mpnet_log("source patch %d %s: %s", which, which < 4 ? names[which] : "?", v ? "ON" : "off");
     }
     return v;
 }

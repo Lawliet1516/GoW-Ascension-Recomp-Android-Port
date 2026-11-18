@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-VERSION = '0.1.34'   # the port release (BilalReloaded); was the launcher's own 0.2
+VERSION = '0.1.35'   # the port release (BilalReloaded); was the launcher's own 0.2
 APP_NAME = 'God of War: Ascension'
 GAME_ID = 'BCES01741'      # the European disc the port is built from
 US_ID = 'BCUS98232'        # the US disc: the same program 16 bytes on (app/us_eboot.py converts its EBOOT)
@@ -112,7 +112,7 @@ SWITCHES = ('LD_PERF_OVERLAY', 'PS3_FPS_LIMIT', 'PS3_FULLSCREEN', 'PS3_WINDOW_SI
             'PS3_PAD_DEADZONE', 'PS3_RENDER_SCALE', 'PS3_VSYNC', 'PS3_ASPECT', 'PS3_SCALE_FILTER',
             'PS3_ANISO', 'PS3_RSX', 'PS3_RSX_RENDERER', 'LD_SMAA', 'LD_SHARPEN', 'LD_VIBRANCE', 'PS3_HOST_PIN', 'PS3_CPU_LIMIT',
             'PS3_DISPLAY_MATCH', 'PS3_PATCHES', 'PS3_PATCH_LIST', 'LD_PSO_PRECOMPILE',
-            'PS3_QUIT_HOLD_MS', 'OCCL', 'FSR3_NATIVE_AA', 'FSR3_FG', 'PS3_MP_MODE', 'LD_UBER', 'LD_AO')
+            'PS3_QUIT_HOLD_MS', 'OCCL', 'FSR3_NATIVE_AA', 'FSR3_FG', 'PS3_MP_MODE', 'LD_UBER', 'LD_AO', 'LD_FULLRES_FX')
 # What the source of this build reads, for when the executable cannot be looked at.
 KNOWN_SWITCHES = frozenset(SWITCHES[:12])
 # The game's clock steps 1/30 s a frame: a higher limit is faster gameplay, so
@@ -146,7 +146,7 @@ SHORT_LABELS = {
     'scale_filter': [('linear', 'Smooth'), ('nearest', 'Sharp'), ('fsr', 'FSR 1')],
 }
 # Home's "New in" line: three short items of this release.
-NEWS = ('Saves: an older save no longer replaces your progress', 'Online: cheats are left out automatically')
+NEWS = ('Saves show the real date in the game', 'Offline multiplayer: no freeze with a 1.04 update file')
 
 # Video. The renderer: RPCS3's RSX (ps3recomp gpu/, a build with
 # -DASCENSION_RPCS3_RSX=ON) or live draw. On macOS, Vulkan is MoltenVK and
@@ -298,6 +298,7 @@ DEFAULTS = {
     'mp_mode': 'trial1', 'mp_map': 'cycle',   # PS3_MP_MODE / PS3_MP_MAP: what Offline Multiplayer's Quick Play starts
     'occlusion': '1',   # OCCL: occlusion culling (the game's hidden-object tests answered; on by default, user 2026-11-05)
     'ambient_occlusion': '0',   # LD_AO: soft contact shadows (2026-11-15, off by default)
+    'smooth_glow': '1',   # LD_FULLRES_FX: full-resolution glow above 1x (on in the game by default; '0' sets LD_FULLRES_FX=0)
     'uber_shaders': '0',   # LD_UBER + LD_UBER_BUDGET + LD_UBER_FAST: ubershader stand-ins while a shader is built (host uber5; NVIDIA only, off by default)
     'cpu_limit': '0',  # PS3_CPU_LIMIT: testing only, run on fewer cores (0 = all)
     'game_window': 'own', 'hide_while_playing': '0',
