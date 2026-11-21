@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x401000" android:required="true" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <application
+        android:allowBackup="false"
+        android:label="GoW Ascension (bring-up)"
+        android:isGame="true"
+        android:extractNativeLibs="true"
+        android:hardwareAccelerated="true">
+        <!-- fullSensor: the bring-up app is rotated through every orientation on purpose (swapchain recreation tests).
+             configChanges: the Activity is NOT recreated on rotation; SDL reports the new size and the renderer reacts. -->
+        <activity
+            android:name=".GowActivity"
+            android:exported="true"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:resizeableActivity="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
