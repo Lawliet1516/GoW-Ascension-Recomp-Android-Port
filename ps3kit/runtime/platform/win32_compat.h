@@ -782,6 +782,13 @@ BOOL   ReleaseSemaphore(HANDLE h, LONG count, LONG* previous);
 HANDLE CreateWaitableTimerA(void* sa, BOOL manual_reset, LPCSTR name);
 HANDLE CreateWaitableTimerW(void* sa, BOOL manual_reset, LPCWSTR name);
 #define CreateWaitableTimer CreateWaitableTimerA
+#ifndef TIMER_ALL_ACCESS
+#define TIMER_ALL_ACCESS 0x1F0003
+#endif
+/* flags: bit 0 = manual reset (CREATE_WAITABLE_TIMER_MANUAL_RESET); the high-resolution bit is ignored. */
+HANDLE CreateWaitableTimerExW(void* sa, LPCWSTR name, DWORD flags, DWORD access);
+/* CPU time of a thread in ns (Windows reports cycles; only differences are used in-tree). */
+BOOL   QueryThreadCycleTime(HANDLE thread, ULONG64* cycles);
 /* due: negative = relative, in 100 ns units (the only form used in-tree);
  * positive = absolute FILETIME. period in ms, 0 = one-shot. */
 BOOL   SetWaitableTimer(HANDLE h, const LARGE_INTEGER* due, LONG period_ms,

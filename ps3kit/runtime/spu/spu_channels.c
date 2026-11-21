@@ -26,6 +26,7 @@
 #endif
 #include <time.h>
 #include "../platform/win32_compat.h"
+#include "../platform/arch_compat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -376,8 +377,8 @@ void spu_dma_copy_rsx(uint8_t* d, const uint8_t* s, uint32_t n, uint32_t ea, int
     while (o) {
         if (o == cut) spu_dma_tear_pause();
         o -= 16u;
-#if defined(__SSE2__) || defined(_M_X64)
-        _mm_storeu_si128((__m128i*)(d + o), _mm_loadu_si128((const __m128i*)(s + o)));
+#if defined(__SSE2__) || defined(_M_X64) || defined(__aarch64__)
+        ps3_v128_storeu(d + o, ps3_v128_loadu(s + o));
 #else
         for (int i = 12; i >= 0; i -= 4) {
             uint32_t w; memcpy(&w, s + o + i, 4);
@@ -782,7 +783,7 @@ static int spu_list_refetch(spu_context* ctx, uint32_t list0, uint32_t n0, uint3
             if (good && memcmp(got, old, r1 - r0) != 0) break;
             waited = ps3_qpc_us() - t0;
             if (waited >= s_us) { no = good ? "main memory holds the same bytes" : "main memory is bad too"; break; }
-            __builtin_ia32_pause();
+            ps3_cpu_pause();
         }
     }
     if (!no) {
@@ -1424,27 +1425,27 @@ static inline int spu_ll_inline(void)
 }
 static inline void spu_ll_copy128(void* d, const void* s)
 {
-    const __m128i* q = (const __m128i*)s; __m128i* o = (__m128i*)d;
-    const __m128i v0 = _mm_loadu_si128(q + 0), v1 = _mm_loadu_si128(q + 1), v2 = _mm_loadu_si128(q + 2), v3 = _mm_loadu_si128(q + 3);
-    const __m128i v4 = _mm_loadu_si128(q + 4), v5 = _mm_loadu_si128(q + 5), v6 = _mm_loadu_si128(q + 6), v7 = _mm_loadu_si128(q + 7);
-    _mm_storeu_si128(o + 0, v0); _mm_storeu_si128(o + 1, v1); _mm_storeu_si128(o + 2, v2); _mm_storeu_si128(o + 3, v3);
-    _mm_storeu_si128(o + 4, v4); _mm_storeu_si128(o + 5, v5); _mm_storeu_si128(o + 6, v6); _mm_storeu_si128(o + 7, v7);
+    const uint8_t* q = (const uint8_t*)s; uint8_t* o = (uint8_t*)d;
+    const ps3_v128 v0 = ps3_v128_loadu(q), v1 = ps3_v128_loadu(q + 16), v2 = ps3_v128_loadu(q + 32), v3 = ps3_v128_loadu(q + 48);
+    const ps3_v128 v4 = ps3_v128_loadu(q + 64), v5 = ps3_v128_loadu(q + 80), v6 = ps3_v128_loadu(q + 96), v7 = ps3_v128_loadu(q + 112);
+    ps3_v128_storeu(o, v0); ps3_v128_storeu(o + 16, v1); ps3_v128_storeu(o + 32, v2); ps3_v128_storeu(o + 48, v3);
+    ps3_v128_storeu(o + 64, v4); ps3_v128_storeu(o + 80, v5); ps3_v128_storeu(o + 96, v6); ps3_v128_storeu(o + 112, v7);
 }
 /* GETLLAR's pair: the line into local store, and the snapshot from what landed there. */
 static inline void spu_ll_copy128x2(void* d1, void* d2, const void* s)
 {
-    const __m128i* q = (const __m128i*)s; __m128i* o1 = (__m128i*)d1; __m128i* o2 = (__m128i*)d2;
-    __m128i v[8];
-    for (int k = 0; k < 8; k++) v[k] = _mm_loadu_si128(q + k);
-    for (int k = 0; k < 8; k++) _mm_storeu_si128(o1 + k, v[k]);
-    for (int k = 0; k < 8; k++) _mm_storeu_si128(o2 + k, v[k]);
+    const uint8_t* q = (const uint8_t*)s; uint8_t* o1 = (uint8_t*)d1; uint8_t* o2 = (uint8_t*)d2;
+    ps3_v128 v[8];
+    for (int k = 0; k < 8; k++) v[k] = ps3_v128_loadu(q + 16 * k);
+    for (int k = 0; k < 8; k++) ps3_v128_storeu(o1 + 16 * k, v[k]);
+    for (int k = 0; k < 8; k++) ps3_v128_storeu(o2 + 16 * k, v[k]);
 }
 static inline int spu_ll_eq128(const void* a, const void* b)
 {
-    const __m128i* p = (const __m128i*)a; const __m128i* q = (const __m128i*)b;
-    __m128i x = _mm_xor_si128(_mm_loadu_si128(p), _mm_loadu_si128(q));
-    for (int k = 1; k < 8; k++) x = _mm_or_si128(x, _mm_xor_si128(_mm_loadu_si128(p + k), _mm_loadu_si128(q + k)));
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(x, _mm_setzero_si128())) == 0xFFFF;
+    const uint8_t* p = (const uint8_t*)a; const uint8_t* q = (const uint8_t*)b;
+    ps3_v128 x = ps3_v128_xor(ps3_v128_loadu(p), ps3_v128_loadu(q));
+    for (int k = 1; k < 8; k++) x = ps3_v128_or(x, ps3_v128_xor(ps3_v128_loadu(p + 16 * k), ps3_v128_loadu(q + 16 * k)));
+    return ps3_v128_is_zero(x);
 }
 
 /* Returns 1 if `cmd` is an atomic line op and was handled here, else 0. */
@@ -4131,11 +4132,6 @@ void spu_spurs_taskset_syscall(spu_context* ctx)   /* non-static: also called by
  * it returns), with the first 32 code bytes at the entry as first seen. Every
  * 5 s the top SPU_SMC_PROF_TOP (default 40) by ticks, as `[smc-prof]` lines:
  * which entries a lift would pay for, and the bytes to find them by. */
-#if defined(_MSC_VER)
-#include <intrin.h>
-#else
-#include <x86intrin.h>
-#endif
 #define SPU_SMC_PROF_SLOTS 8192u
 static struct { int used, img, ovl; uint32_t pc; unsigned long long calls, ticks, all_ticks; uint8_t code[32]; }
     s_smc_prof[SPU_SMC_PROF_SLOTS];
@@ -4144,7 +4140,7 @@ static void spu_smc_prof_note(int img, int ovl, uint32_t pc, const uint8_t code[
 {
     static int s_top = -1; static unsigned long long s_t0, s_total;
     if (s_top < 0) { const char* t = getenv("SPU_SMC_PROF_TOP"); s_top = t && atoi(t) > 0 ? atoi(t) : 40; }
-    while (_InterlockedExchange(&s_smc_prof_lock, 1)) _mm_pause();
+    while (_InterlockedExchange(&s_smc_prof_lock, 1)) ps3_cpu_pause();
     unsigned slot = ((pc >> 2) * 2654435761u ^ (unsigned)ovl * 40503u ^ (unsigned)img) & (SPU_SMC_PROF_SLOTS - 1u);
     for (unsigned probe = 0; probe < SPU_SMC_PROF_SLOTS; probe++, slot = (slot + 1) & (SPU_SMC_PROF_SLOTS - 1u)) {
         if (!s_smc_prof[slot].used) {
@@ -5322,9 +5318,9 @@ static __attribute__((noinline)) void spu_indirect_branch_full(spu_context* ctx)
           const int img = ctx->image_id, ovl = ctx->resident_ovl;
           uint8_t code[32];
           for (uint32_t k = 0; k < 32; k++) code[k] = ctx->ls[(start + k) & SPU_LS_MASK];
-          const unsigned long long c0 = __rdtsc();
+          const unsigned long long c0 = ps3_tick();
           const int ok = spu_smc_microstep(ctx);
-          spu_smc_prof_note(img, ovl, start, code, __rdtsc() - c0);
+          spu_smc_prof_note(img, ovl, start, code, ps3_tick() - c0);
           if (ok) return;
       } else if (spu_smc_microstep(ctx))
           return; }

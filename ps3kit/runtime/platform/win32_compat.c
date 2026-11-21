@@ -360,6 +360,16 @@ HANDLE CreateWaitableTimerA(void* sa, BOOL manual_reset, LPCSTR name)
 }
 HANDLE CreateWaitableTimerW(void* sa, BOOL manual_reset, LPCWSTR name)
 { (void)name; return CreateWaitableTimerA(sa, manual_reset, NULL); }
+HANDLE CreateWaitableTimerExW(void* sa, LPCWSTR name, DWORD flags, DWORD access)
+{ (void)name; (void)access; return CreateWaitableTimerA(sa, (flags & 1u) ? TRUE : FALSE, NULL); }
+BOOL QueryThreadCycleTime(HANDLE thread, ULONG64* cycles)
+{
+    (void)thread;   /* callers only pass the current thread */
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) return FALSE;
+    *cycles = (ULONG64)ts.tv_sec * 1000000000ull + (ULONG64)ts.tv_nsec;
+    return TRUE;
+}
 BOOL SetWaitableTimer(HANDLE h, const LARGE_INTEGER* due, LONG period_ms,
                       void* completion, void* arg, BOOL resume)
 {
@@ -457,7 +467,13 @@ static void apply_affinity(pthread_t pt, DWORD_PTR mask)
     cpu_set_t set; CPU_ZERO(&set);
     for (unsigned i = 0; i < 8 * sizeof mask && i < CPU_SETSIZE; i++)
         if (mask & ((DWORD_PTR)1 << i)) CPU_SET(i, &set);
+#if defined(__ANDROID__)
+    /* bionic has no pthread_setaffinity_np: the kernel tid is what sched_setaffinity wants */
+    if (pthread_equal(pt, pthread_self())) sched_setaffinity(0, sizeof set, &set);
+    else (void)pt;   /* other threads: set from their own start routine */
+#else
     pthread_setaffinity_np(pt, sizeof set, &set);
+#endif
 #else
     /* Apple Silicon has no thread affinity; QoS (above) is the lever there. */
     (void)pt; (void)mask;
