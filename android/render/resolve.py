@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolves the conflict hunks of render/video/<file> (produced by merge_file.py) by an explicit, reviewed list of decisions.
+"""Resolves the conflict hunks of render/libs/video/<file> (produced by merge_file.py) by an explicit, reviewed list of decisions.
    usage in a script:  resolve(path, [decision, ...])  one decision per hunk, in file order:
      'ours' | 'theirs' | 'both' (fork block then upstream block) | ('both_sep', text) (fork block, text, upstream block) | ('text', t)
    Fails loudly if the number of decisions differs from the number of hunks, so a changed merge can never be resolved blind."""

@@ -1,0 +1,32 @@
+diff --git a/libs/spurs/cellFiber.c b/libs/spurs/cellFiber.c
+index 2167d5d..1d139ce 100644
+--- a/libs/spurs/cellFiber.c
++++ b/libs/spurs/cellFiber.c
+@@ -32,6 +32,10 @@
+ #include <pthread.h>
+ #if PS3RECOMP_FIBER_HOST_AARCH64
+ #include "../../runtime/platform/host_fiber.h"
++#elif defined(__ANDROID__)
++/* bionic has no ucontext: the AArch64 shim of this Android port (runtime/platform/ps3_ucontext.{h,c}) */
++#include "../../runtime/platform/ps3_ucontext.h"
++#define makecontext(c, fn, argc, a, b) PS3_MAKECONTEXT(c, fn, a, b)
+ #else
+ #include <ucontext.h>
+ 
+diff --git a/runtime/platform/win32_compat.c b/runtime/platform/win32_compat.c
+index de3a1ce..f12052e 100644
+--- a/runtime/platform/win32_compat.c
++++ b/runtime/platform/win32_compat.c
+@@ -459,7 +459,12 @@ static void apply_affinity(pthread_t pt, DWORD_PTR mask)
+     cpu_set_t set; CPU_ZERO(&set);
+     for (unsigned i = 0; i < 8 * sizeof mask && i < CPU_SETSIZE; i++)
+         if (mask & ((DWORD_PTR)1 << i)) CPU_SET(i, &set);
++#if defined(__ANDROID__)
++    /* bionic has no pthread_setaffinity_np: only the calling thread can be set (sched_setaffinity on the kernel tid) */
++    if (pthread_equal(pt, pthread_self())) sched_setaffinity(0, sizeof set, &set);
++#else
+     pthread_setaffinity_np(pt, sizeof set, &set);
++#endif
+ #else
+     /* Apple Silicon has no thread affinity; QoS (above) is the lever there. */
+     (void)pt; (void)mask;
