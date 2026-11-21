@@ -1,0 +1,26 @@
+--- upstream-v0.15.0/rsx_vp_decompiler.h
++++ fork/rsx_vp_decompiler.h
+@@ -71,9 +71,23 @@
+     const u8* ucode, u32 max_bytes, u32 vtex_mask, u32 input_mask,
+     char* out, u32 out_size);
+ 
++/* As rsx_vp_decompile_compact_ex, with the inputs as the guest's bytes
++ * (LD_VTX_RAW): raw_kind[attr] = type * 8 + size declares ATTRn as uint4
++ * words that the shader decodes like rsx_vertex_decode_element (big-endian
++ * float, half, s16n, s16, u8n, u8, cmp); 0 keeps a float4 input. An
++ * inexact analysis declares all 16 inputs, as the compact variant does. */
++int rsx_vp_decompile_compact_raw_ex(
++    const u8* ucode, u32 max_bytes, u32 vtex_mask, u32 input_mask,
++    const u8 raw_kind[16], char* out, u32 out_size);
++
+ /* Mnemonics for the vector / scalar opcode fields ("?" if unknown). */
+ const char* rsx_vp_vec_name(u32 op);
+ const char* rsx_vp_sca_name(u32 op);
++
++/* LD_SHADER_STATS (see the .c): count a program's opcodes and modifiers once
++ * per distinct program; returns the o[] registers it writes (bit n = o[n]). */
++u32 rsx_vp_stats_note(const u8* ucode, u32 max_bytes);
++void rsx_vp_stats_print(void);
+ 
+ #ifdef __cplusplus
+ }

@@ -25,16 +25,6 @@ typedef struct rsx_vertex_layout_plan {
     u8 count;
     u8 attrs[RSX_DSP_NUM_VERTEX_ATTR];
     s8 slot_by_attr[RSX_DSP_NUM_VERTEX_ATTR];
-    /* LD_VTX_RAW (rsx_live_draw.c): the attributes arrive as the guest's own
-     * bytes and the vertex shader decodes them. Per slot: raw_kind 0 = a
-     * float4 (an attribute with no array: its constant value), else
-     * type * 8 + size; raw_in = input slot, raw_off = byte offset in it,
-     * raw_words = 32-bit words read. All zero when raw is 0. */
-    u8 raw;
-    u8 raw_kind[RSX_DSP_NUM_VERTEX_ATTR];
-    u8 raw_in[RSX_DSP_NUM_VERTEX_ATTR];
-    u8 raw_words[RSX_DSP_NUM_VERTEX_ATTR];
-    u16 raw_off[RSX_DSP_NUM_VERTEX_ATTR];
 } rsx_vertex_layout_plan;
 
 typedef struct rsx_vertex_ref {
@@ -54,12 +44,6 @@ typedef struct rsx_vertex_remap {
     rsx_vertex_remap_slot* slots;
     u32 slot_capacity;
     u32 generation;
-    /* Direct table for a draw whose references share one base index and
-     * span a small vertex-id range: index = vertex_id - min, no hashing. */
-    u32* dir_stamp;
-    u32* dir_value;
-    u32 dir_capacity;
-    u32 dir_generation;
 } rsx_vertex_remap;
 
 typedef struct rsx_vertex_fetch_attr {
@@ -113,6 +97,11 @@ void rsx_vertex_fetch_plan_set_inline(
     rsx_vertex_fetch_plan* plan, const rsx_dispatch* rsx,
     const u8* data, u32 bytes);
 
+/* Renderer default for a disabled attribute. The legacy white ATTR3 fallback
+ * applies only before a current color has been explicitly written. Shared by
+ * the compact and legacy fetch paths. */
+void rsx_vertex_fetch_default(const rsx_dispatch* rsx, u32 attr, float out[4]);
+
 /* Decode all 16 descriptors/defaults once for a draw. */
 void rsx_vertex_fetch_plan_init(
     rsx_vertex_fetch_plan* plan, const rsx_dispatch* rsx,
@@ -132,38 +121,13 @@ void rsx_vertex_fetch_plan_prepare(
 int rsx_vertex_fetch_one(
     const rsx_vertex_fetch_plan* plan, const rsx_vertex_ref* ref, u8* out);
 
-/* rsx_vertex_fetch_one for refs[0..count), into out + i * layout.stride,
- * attribute by attribute: each attribute's format and span are settled once
- * instead of once per vertex. Same bytes, same failure rule. */
+/* rsx_vertex_fetch_one for refs[0..count) into consecutive compact vertices
+ * at out (layout.stride apart), with the same values and the same failure:
+ * 0 when some vertex's enabled ATTR0 cannot be fetched. Walks attribute by
+ * attribute so each vertex type decodes in a loop of its own. */
 int rsx_vertex_fetch_many(
-    const rsx_vertex_fetch_plan* plan, const rsx_vertex_ref* refs,
-    u32 count, u8* out);
-
-/* The batch fetch's SSE4.1 loops (LD_VTX_SIMD, default on): -1 until the
- * first batch reads the environment; set 0/1 to override (tests). */
-extern int rsx_vertex_fetch_simd;
-
-/* LD_VTX_FAST (default on): the AVX2 + FMA batch fetch, prepare span and
- * index decode, on CPUs that have both (checked once). -1 until the first
- * use reads the environment; set 0/1 to override (tests). Same bytes. */
-extern int rsx_vertex_fetch_fast;
-
-/* refs[i] = { first_vertex + i, base_index } for i < count. */
-void rsx_vertex_fill_run_refs(
-    rsx_vertex_ref* refs, u32 first_vertex, u32 base_index, u32 count);
-
-/* One triangle-strip segment (begin, count references) as triangle-list
- * indices: for i + 2 < count, triangle i is (i + (i & 1), i + 1 - (i & 1),
- * i + 2) from begin, each through map (map[x]; NULL: x itself). Returns the
- * number of indices written, 3 * (count - 2). */
-u32 rsx_vertex_strip_indices(const u32* map, u32 begin, u32 count, u32* out);
-
-/* out[i] = first + i for i < count. */
-void rsx_vertex_fill_iota(u32* out, u32 first, u32 count);
-
-/* LD_VTX_FAST's switch alone, without the CPU check (the live renderer's
- * plain-C shortcuts that come with it). */
-int rsx_vertex_fast_switch(void);
+    const rsx_vertex_fetch_plan* plan, const rsx_vertex_ref* refs, u32 count,
+    u8* out);
 
 /* Collapse repeated (vertex_id, base_index) references in first-use order.
  * refs is rewritten in place with the unique prefix.  The occurrence map
@@ -172,24 +136,8 @@ int rsx_vertex_remap_build(
     rsx_vertex_remap* remap, rsx_vertex_ref* refs, u32 count,
     u32* unique_count);
 
-/* Room for `count` occurrences in remap->occurrence_to_unique. */
-int rsx_vertex_remap_reserve(rsx_vertex_remap* remap, u32 count);
-
-/* Decode big-endian indices (u16, or u32 when is_u32) from `src` into `out`,
- * stopping before the first one equal to `stop` when stop_enabled (a primitive
- * restart). Returns how many were decoded: `count` when no stop value came.
- * *lo and *hi are lowered/raised to the smallest and largest decoded index. */
-u32 rsx_vertex_decode_index_run(
-    const u8* src, u32 count, int is_u32, int stop_enabled, u32 stop,
-    u32* out, u32* lo, u32* hi);
-
-/* Inline: it runs once per index of every indexed draw. */
-static inline u32 rsx_vertex_remap_index(
-    const rsx_vertex_remap* remap, u32 occurrence)
-{
-    return remap && occurrence < remap->occurrence_capacity
-        ? remap->occurrence_to_unique[occurrence] : occurrence;
-}
+u32 rsx_vertex_remap_index(
+    const rsx_vertex_remap* remap, u32 occurrence);
 
 void rsx_vertex_remap_destroy(rsx_vertex_remap* remap);
 

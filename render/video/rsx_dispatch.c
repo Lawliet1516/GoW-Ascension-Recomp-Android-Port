@@ -45,6 +45,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "ps3emu/log_first.h"
 
 #define M_DMA_COLOR1            0x018C
 #define M_DMA_COLOR0            0x0194
@@ -146,8 +147,6 @@ static void mark_class(rsx_dispatch* rsx, u32 method, u32 count, u8 klass)
 void rsx_dispatch_init(rsx_dispatch* rsx, const rsx_dispatch_sink* sink)
 {
     memset(rsx, 0, sizeof(*rsx));
-    g_rsx_dsp_pso_epoch++;   /* LD_PSO_SAME */ g_rsx_dsp_bind_epoch++;   /* LD_DRAW_REUSE */
-    g_rsx_dsp_vp_gen++; g_rsx_dsp_pso_stable++;   /* DRAW-COST */
     if (sink)
         rsx->sink = *sink;
 
@@ -171,7 +170,13 @@ void rsx_dispatch_init(rsx_dispatch* rsx, const rsx_dispatch_sink* sink)
      * 0xFFFFFF00 = depth 1.0, stencil 0 (RPCS3 rsx_methods.cpp reset image
      * as numbering oracle). Seeded so a raw register read is trustworthy for
      * clear consumers, mirroring COLOR_MASK/FRONT_FACE above. */
-    rsx->regs[0x1D8C >> 2] = 0xFFFFFF00u;
+    rsx->regs[0x1D8C >> 2] = RSX_DSP_ZSTENCIL_CLEAR_RESET;
+
+    /* NV40 reset ZMIN_MAX_CONTROL (0x1D78) is 1: clip at the near and far
+     * planes, no depth clamp (RPCS3 rsx_methods.cpp; the GCM default of
+     * cellGcmSetZMinMaxControl(TRUE, FALSE, FALSE)). Seeded so a raw 0 means
+     * a title that turned clipping off. */
+    rsx->regs[0x1D78 >> 2] = 0x00000001u;
 
     /* Execution methods */
     mark_class(rsx, M_VERTEX_BEGIN_END,  1, RSX_DSP_CLASS_EXEC);
@@ -237,8 +242,6 @@ void rsx_dispatch_seed_registers(rsx_dispatch* rsx, const u32* regs, u32 count)
     if (count > RSX_DSP_NUM_REGS)
         count = RSX_DSP_NUM_REGS;
     memcpy(rsx->regs, regs, count * sizeof(u32));
-    g_rsx_dsp_pso_epoch++;   /* LD_PSO_SAME */ g_rsx_dsp_bind_epoch++;   /* LD_DRAW_REUSE */
-    g_rsx_dsp_vp_gen++; g_rsx_dsp_pso_stable++;   /* DRAW-COST */
 }
 
 void rsx_dispatch_seed_transform_program(rsx_dispatch* rsx, const u32* words, u32 count)
@@ -246,8 +249,6 @@ void rsx_dispatch_seed_transform_program(rsx_dispatch* rsx, const u32* words, u3
     if (count > RSX_DSP_VP_WORDS)
         count = RSX_DSP_VP_WORDS;
     memcpy(rsx->vp, words, count * sizeof(u32));
-    g_rsx_dsp_pso_epoch++;   /* LD_PSO_SAME */ g_rsx_dsp_bind_epoch++;   /* LD_DRAW_REUSE */
-    g_rsx_dsp_vp_gen++; g_rsx_dsp_pso_stable++;   /* DRAW-COST */
 }
 
 void rsx_dispatch_seed_transform_constants(rsx_dispatch* rsx, const u32* words, u32 count)
@@ -256,7 +257,6 @@ void rsx_dispatch_seed_transform_constants(rsx_dispatch* rsx, const u32* words, 
     if (count > max_words)
         count = max_words;
     memcpy(rsx->constants, words, count * sizeof(u32));
-    g_rsx_dsp_const_gen++;   /* LD_CB_GEN */
 }
 
 /* Every NV4097_SET_VERTEX_DATA* variant writes the same constant ("current")
@@ -266,138 +266,10 @@ void rsx_dispatch_seed_transform_constants(rsx_dispatch* rsx, const u32* words, 
  * on every glyph, and 58 draws a frame reached an all-black screen. Fold each
  * variant into the 4F slots rsx_dsp_vertex_default reads. Offsets and packing
  * from the SDK (gcm_implementation_sub.h; x is the LOW byte/half). */
-/* LD_PSO_SAME's change counter (rsx_dispatch.h). s_pso_quiet[i]: register i
- * is never read by the live draw's pipeline choice (get_pso), so changing it
- * does not count. Only what is certain is listed: */
-int rsx_dsp_pso_epoch_on;
-unsigned g_rsx_dsp_pso_epoch = 1;
-unsigned g_rsx_dsp_const_gen = 1;   /* every transform-constant write (LD_CB_GEN) */
-unsigned g_rsx_dsp_pso_last;     /* the register (index) whose change counted last */
-/* LD_DRAW_REUSE: every change of a register value except the ones that only
- * say where this draw's vertices and indices are, start it, upload program
- * words or constants (counted by g_rsx_dsp_const_gen and the program check),
- * or are the front end's references, reports, semaphores and clear values.
- * Texture offsets count here (a different texture is a different binding),
- * unlike for g_rsx_dsp_pso_epoch. */
-unsigned g_rsx_dsp_bind_epoch = 1;
-unsigned g_rsx_dsp_bind_last;   /* the register (index) whose change counted last */
-/* Cull mode, winding and polygon offset: read only by the pipeline choice
- * and the depth offset in the vertex constants (LD_ZBIAS_VS), which the reuse
- * works out again when this counter moved (God of War: Ascension flips
- * FRONT_FACE between EDGE segments of mirrored meshes and toggles the offset
- * for decals: ~25% of its draws). */
-unsigned g_rsx_dsp_raster_epoch = 1;
-/* DRAW-COST (DRAWOPT_HEAD, rsx_live_draw.c): moves with every change of a transform-program word or of its start
- * (and at any seed or quiet-list change), while g_rsx_dsp_pso_epoch is counted. */
-unsigned g_rsx_dsp_vp_gen = 1;
-/* DRAW-COST (DRAWOPT_PSO, rsx_live_draw.c's pipeline-choice memo): moves with
- * g_rsx_dsp_pso_epoch, except for the registers made volatile
- * (rsx_dispatch_pso_volatile), whose values the memo compares itself. */
-unsigned g_rsx_dsp_pso_stable = 1;
-static u8 s_pso_vol[RSX_DSP_NUM_REGS];
-static u8 s_pso_quiet[RSX_DSP_NUM_REGS];
-static u8 s_bind_quiet[RSX_DSP_NUM_REGS];   /* 1: never counts, 2: counts in g_rsx_dsp_raster_epoch */
-static void dsp_bind_quiet_init(void)
-{
-    for (u32 m = 0x0000; m < 0x0100; m += 4) s_bind_quiet[m >> 2] = 1;   /* NV406E: ref, semaphores */
-    s_bind_quiet[0x0100 >> 2] = s_bind_quiet[0x0104 >> 2] = s_bind_quiet[0x0110 >> 2] = 1;   /* NOP, NOTIFY, WAIT_FOR_IDLE */
-    for (u32 m = 0x0B80; m < 0x0C00; m += 4) s_bind_quiet[m >> 2] = 1;   /* program upload port */
-    s_bind_quiet[0x1E9C >> 2] = 1;                                         /* program upload slot */
-    for (u32 m = 0x1EFC; m < 0x1F80; m += 4) s_bind_quiet[m >> 2] = 1;   /* constant upload slot + window */
-    for (u32 m = 0x1680; m < 0x16C0; m += 4) s_bind_quiet[m >> 2] = 1;   /* vertex array offsets */
-    s_bind_quiet[0x1738 >> 2] = s_bind_quiet[0x173C >> 2] = 1;             /* VERTEX_DATA_BASE_OFFSET / _INDEX */
-    s_bind_quiet[0x17C8 >> 2] = s_bind_quiet[0x1800 >> 2] = 1;             /* CLEAR_REPORT_VALUE, GET_REPORT */
-    s_bind_quiet[0x1808 >> 2] = s_bind_quiet[0x1814 >> 2] = s_bind_quiet[0x1818 >> 2] = 1;   /* BEGIN_END, DRAW_ARRAYS, INLINE_ARRAY */
-    s_bind_quiet[0x181C >> 2] = s_bind_quiet[0x1820 >> 2] = s_bind_quiet[0x1824 >> 2] = 1;   /* INDEX_ARRAY_*, DRAW_INDEX_ARRAY */
-    s_bind_quiet[0x1D6C >> 2] = s_bind_quiet[0x1D70 >> 2] = s_bind_quiet[0x1D74 >> 2] = 1;   /* back-end semaphores */
-    s_bind_quiet[0x1D8C >> 2] = s_bind_quiet[0x1D90 >> 2] = s_bind_quiet[0x1D94 >> 2] = 1;   /* clear values, CLEAR_SURFACE */
-    s_bind_quiet[0x0354 >> 2] = 1;   /* BACK_STENCIL_FUNC_REF: D3D12 has the front reference only */
-    s_bind_quiet[0x0334 >> 2] = 1;   /* STENCIL_FUNC_REF: dynamic state, set on every draw */
-    s_bind_quiet[0x1830 >> 2] = s_bind_quiet[0x1834 >> 2] = s_bind_quiet[0x183C >> 2] = 2;   /* CULL_FACE, FRONT_FACE, CULL_FACE_ENABLE */
-    s_bind_quiet[0x0A68 >> 2] = s_bind_quiet[0x0A78 >> 2] = s_bind_quiet[0x0A7C >> 2] = 2;   /* POLY_OFFSET_FILL_ENABLE, its slope and bias */
-}
-void rsx_dispatch_bind_quiet(u32 lo, u32 hi)
-{
-    for (u32 m = lo & ~3u; m <= hi && (m >> 2) < RSX_DSP_NUM_REGS; m += 4) s_bind_quiet[m >> 2] = 1;
-    g_rsx_dsp_vp_gen++;   /* DRAW-COST */
-}
-void rsx_dispatch_pso_epoch_enable(void)
-{
-    if (rsx_dsp_pso_epoch_on) return;
-    dsp_bind_quiet_init();
-    for (u32 m = 0x0000; m < 0x0100; m += 4) s_pso_quiet[m >> 2] = 1;   /* NV406E: ref, semaphores */
-    s_pso_quiet[0x0100 >> 2] = 1;                       /* NOP */
-    s_pso_quiet[0x0104 >> 2] = 1;                       /* NOTIFY */
-    s_pso_quiet[0x0110 >> 2] = 1;                       /* WAIT_FOR_IDLE */
-    for (u32 m = 0x0B80; m < 0x0C00; m += 4) s_pso_quiet[m >> 2] = 1;   /* program upload port: the words count (below) */
-    s_pso_quiet[0x1E9C >> 2] = 1;                       /* program upload slot */
-    for (u32 m = 0x1EFC; m < 0x1F80; m += 4) s_pso_quiet[m >> 2] = 1;   /* constant upload slot + window */
-    for (u32 m = 0x1680; m < 0x16C0; m += 4) s_pso_quiet[m >> 2] = 1;   /* vertex array offsets */
-    s_pso_quiet[0x1738 >> 2] = 1;                       /* VERTEX_DATA_BASE_OFFSET */
-    s_pso_quiet[0x173C >> 2] = 1;                       /* VERTEX_DATA_BASE_INDEX */
-    s_pso_quiet[0x17C8 >> 2] = 1;                       /* CLEAR_REPORT_VALUE */
-    s_pso_quiet[0x1800 >> 2] = 1;                       /* GET_REPORT */
-    s_pso_quiet[0x1808 >> 2] = 1;                       /* BEGIN_END */
-    s_pso_quiet[0x1814 >> 2] = 1;                       /* DRAW_ARRAYS */
-    s_pso_quiet[0x1818 >> 2] = 1;                       /* INLINE_ARRAY */
-    s_pso_quiet[0x181C >> 2] = 1;                       /* INDEX_ARRAY_ADDRESS */
-    s_pso_quiet[0x1820 >> 2] = 1;                       /* INDEX_ARRAY_DMA */
-    s_pso_quiet[0x1824 >> 2] = 1;                       /* DRAW_INDEX_ARRAY */
-    s_pso_quiet[0x1D6C >> 2] = 1;                       /* SEMAPHORE_OFFSET */
-    s_pso_quiet[0x1D70 >> 2] = 1;                       /* BACK_END_WRITE_SEMAPHORE_RELEASE */
-    s_pso_quiet[0x1D74 >> 2] = 1;                       /* TEXTURE_READ_SEMAPHORE_RELEASE */
-    s_pso_quiet[0x1D8C >> 2] = 1;                       /* clear depth value */
-    s_pso_quiet[0x1D90 >> 2] = 1;                       /* clear colour value */
-    s_pso_quiet[0x1D94 >> 2] = 1;                       /* CLEAR_SURFACE */
-    /* Texture image offsets: get_pso reads a unit's offset only to match it
-     * against depth snapshots (LD_PSO_SAME never reuses with a depth-format
-     * unit enabled) and surfaces (ld_surf_scale_units, recomputed on reuse). */
-    for (u32 u = 0; u < 16; u++) s_pso_quiet[(0x1A00 + u * 0x20) >> 2] = 1;
-    g_rsx_dsp_pso_epoch++;
-    g_rsx_dsp_vp_gen++; g_rsx_dsp_pso_stable++;   /* DRAW-COST */
-    __atomic_store_n(&rsx_dsp_pso_epoch_on, 1, __ATOMIC_RELEASE);
-}
-/* DRAW-COST (DRAWOPT_PSO, rsx_live_draw.c): the registers the pipeline choice
- * reads (s_pso_quiet clear) whose changes do not end a reuse of the bindings
- * (s_bind_quiet set) -- the only registers get_pso reads that can differ
- * between two draws of one LD_DRAW_REUSE run (today the cull mode, winding and
- * polygon offset). Their indices into idx[] (at most max); returns how many
- * there are. Valid once rsx_dispatch_pso_epoch_enable() has run. */
-u32 rsx_dispatch_pso_unpinned(u32* idx, u32 max)
-{
-    u32 n = 0;
-    if (!rsx_dsp_pso_epoch_on) return 0;
-    for (u32 i = 0; i < RSX_DSP_NUM_REGS; i++)
-        if (!s_pso_quiet[i] && s_bind_quiet[i]) { if (n < max) idx[n] = i; n++; }
-    return n;
-}
-void rsx_dispatch_pso_quiet(u32 lo, u32 hi)
-{
-    for (u32 m = lo & ~3u; m <= hi && (m >> 2) < RSX_DSP_NUM_REGS; m += 4) s_pso_quiet[m >> 2] = 1;
-    g_rsx_dsp_vp_gen++; g_rsx_dsp_pso_stable++;   /* DRAW-COST */
-}
-/* DRAW-COST (DRAWOPT_PSO): registers [lo, hi] still count in
- * g_rsx_dsp_pso_epoch but not in g_rsx_dsp_pso_stable. */
-void rsx_dispatch_pso_volatile(u32 lo, u32 hi)
-{
-    for (u32 m = lo & ~3u; m <= hi && (m >> 2) < RSX_DSP_NUM_REGS; m += 4) s_pso_vol[m >> 2] = 1;
-    g_rsx_dsp_pso_stable++;
-}
-static inline void dsp_pso_note(const rsx_dispatch* rsx, u32 idx, u32 arg)
-{
-    if (rsx->regs[idx] != arg) {
-        if (!s_pso_quiet[idx]) { g_rsx_dsp_pso_epoch++; g_rsx_dsp_pso_last = idx; g_rsx_dsp_pso_stable += !s_pso_vol[idx]; }
-        if (idx == (M_VP_START_FROM_ID >> 2)) g_rsx_dsp_vp_gen++;   /* DRAW-COST: DRAWOPT_HEAD */
-        if (!s_bind_quiet[idx]) { g_rsx_dsp_bind_epoch++; g_rsx_dsp_bind_last = idx; }   /* LD_DRAW_REUSE */
-        else if (s_bind_quiet[idx] == 2) g_rsx_dsp_raster_epoch++;
-    }
-}
-
 static void vtx_const_set(rsx_dispatch* rsx, u32 attr, u32 c, float v)
 {
     u32 w; memcpy(&w, &v, 4);
     const u32 idx = (M_VTX_ATTR_4F + attr * 0x10 + c * 4) >> 2;
-    if (__builtin_expect(rsx_dsp_pso_epoch_on, 0)) dsp_pso_note(rsx, idx, w);
     rsx->regs[idx] = w;
     /* Folded packed constants also have an explicit canonical value, even
      * when every component is zero. Immediate snapshots need that presence. */
@@ -439,39 +311,45 @@ static void vtx_const_fold(rsx_dispatch* rsx, u32 m, u32 arg)
     }
 }
 
-/* Transform constant upload window: word i of the burst writes
- * constants[VP_UPLOAD_CONST_ID + i/4][i%4]; the load pointer does NOT
- * advance. */
-static inline void dsp_vp_const(rsx_dispatch* rsx, u32 method, u32 arg)
+void rsx_dispatch_method(rsx_dispatch* rsx, u32 method, u32 arg)
 {
-    const u32 word = (method - M_VP_UPLOAD_CONST) >> 2;
-    const u32 slot = rsx->regs[M_VP_UPLOAD_CONST_ID >> 2] + (word >> 2);
-    if (slot < RSX_DSP_NUM_CONSTANTS) {
-        rsx->constants[slot][word & 3] = arg;
-        g_rsx_dsp_const_gen++;   /* LD_CB_GEN */
+    method &= 0xFFFFC;
+    const u32 idx = method >> 2;
+    /* regs[] covers methods 0..0xFFFC (subchannel bits included). A larger
+     * value is not a method -- and indexing with it wrote past regs[] into
+     * vp[] and constants[]: Tornado Outbreak's c[461] held two copies of a
+     * "load constant 461" command header, i.e. FIFO words stored as shader
+     * constants. Drop it, and say what it was. */
+    if (idx >= RSX_DSP_NUM_REGS) {
+        static int n = 0;
+        if (PS3_LOG_FIRST(n, 8))
+            fprintf(stderr, "[rsx-dispatch] method 0x%05X (arg 0x%08X) out of range -- dropped\n",
+                    method, arg);
+        return;
     }
-    /* RSX_CONST_LOG=<lo>,<hi>: every transform-constant upload into that
-     * slot range (first 400) -- what a shader's constants really were. */
-    { static int lo = -2, hi = 0, n = 0;
-      if (lo == -2) { const char* e = getenv("RSX_CONST_LOG"); lo = -1;
-                      if (e) sscanf(e, "%d,%d", &lo, &hi); }
-      if (lo >= 0 && (int)slot >= lo && (int)slot <= hi && n < 400) { n++;
-          fprintf(stderr, "[const-load] c[%u].%c = 0x%08X (method 0x%04X id=%u)\n", slot,
-                  "xyzw"[word & 3], arg, method, rsx->regs[M_VP_UPLOAD_CONST_ID >> 2]); } }
-}
-
-/* Everything rsx_dispatch_method does after storing the register. */
-static void dsp_method_effects(rsx_dispatch* rsx, u32 method, u32 arg)
-{
+    rsx->seen[idx]++;
+    rsx->regs[idx] = arg;
     if ((method >= 0x1500 && method < 0x1A00) || (method >= 0x1E40 && method < 0x1E80) ||
         (method >= 0x0A80 && method < 0x0B00))
         vtx_const_fold(rsx, method, arg);
 
-    /* Completing a floating-point position emits a register-based vertex.
-     * Other attributes update the current values copied with that position.
-     * Keep these writes as ordinary constant state outside BEGIN/END. */
-    if (rsx->in_begin_end && (method == 0x1508 || method == 0x1C0C) &&
-        rsx->sink.immediate_vertex)
+    /* Completing a position emits a register-based vertex: the last word of
+     * ATTR0 in any of its immediate encodings. Other attributes update the
+     * current values copied with that position. Keep these writes as ordinary
+     * constant state outside BEGIN/END.
+     *
+     * Only the float encodings used to count (DATA3F's Z, DATA4F's W).
+     * Resistance's movie player sends its quad as DATA2S positions, so every
+     * movie frame drew nothing and the cutscenes played on a black screen. */
+    if (rsx->in_begin_end && rsx->sink.immediate_vertex &&
+        (method == 0x1508 ||    /* DATA3F  Z            */
+         method == 0x1C0C ||    /* DATA4F  W            */
+         method == 0x1884 ||    /* DATA2F  Y            */
+         method == 0x1E40 ||    /* DATA1F  X            */
+         method == 0x1900 ||    /* DATA2S  (one word)   */
+         method == 0x1940 ||    /* DATA4UB (one word)   */
+         method == 0x1984 ||    /* DATA4S  second word  */
+         method == 0x0A84))     /* SCALED4S second word */
         rsx->sink.immediate_vertex(rsx->sink.user, rsx);
 
     /* Transform program upload window: word goes to instruction slot
@@ -481,23 +359,29 @@ static void dsp_method_effects(rsx_dispatch* rsx, u32 method, u32 arg)
         const u32 lane = ((method - M_VP_UPLOAD_INST) >> 2) & 3;
         u32* load = &rsx->regs[M_VP_UPLOAD_FROM_ID >> 2];
         const u32 pos = *load * 4 + lane;
-        if (pos < RSX_DSP_VP_WORDS) {
-            if (__builtin_expect(rsx_dsp_pso_epoch_on, 0) && rsx->vp[pos] != arg) {
-                g_rsx_dsp_pso_epoch++;   /* LD_PSO_SAME: the program changed */
-                g_rsx_dsp_vp_gen++; g_rsx_dsp_pso_stable++;   /* DRAW-COST: DRAWOPT_HEAD, DRAWOPT_PSO */
-                g_rsx_dsp_pso_last = M_VP_UPLOAD_INST >> 2;
-                g_rsx_dsp_bind_epoch++;  /* LD_DRAW_REUSE */
-            }
+        if (pos < RSX_DSP_VP_WORDS)
             rsx->vp[pos] = arg;
-        }
         if (lane == 3)
             (*load)++;
         return;
     }
 
-    /* Transform constant upload window (dsp_vp_const). */
+    /* Transform constant upload window: word i of the burst writes
+     * constants[VP_UPLOAD_CONST_ID + i/4][i%4]; the load pointer does NOT
+     * advance. */
     if (method >= M_VP_UPLOAD_CONST && method < M_VP_UPLOAD_CONST + 32 * 4) {
-        dsp_vp_const(rsx, method, arg);
+        const u32 word = (method - M_VP_UPLOAD_CONST) >> 2;
+        const u32 slot = rsx->regs[M_VP_UPLOAD_CONST_ID >> 2] + (word >> 2);
+        if (slot < RSX_DSP_NUM_CONSTANTS)
+            rsx->constants[slot][word & 3] = arg;
+        /* RSX_CONST_LOG=<lo>,<hi>: every transform-constant upload into that
+         * slot range (first 400) -- what a shader's constants really were. */
+        { static int lo = -2, hi = 0, n = 0;
+          if (lo == -2) { const char* e = getenv("RSX_CONST_LOG"); lo = -1;
+                          if (e) sscanf(e, "%d,%d", &lo, &hi); }
+          if (lo >= 0 && (int)slot >= lo && (int)slot <= hi && n < 400) { n++;
+              fprintf(stderr, "[const-load] c[%u].%c = 0x%08X (method 0x%04X id=%u)\n", slot,
+                      "xyzw"[word & 3], arg, method, rsx->regs[M_VP_UPLOAD_CONST_ID >> 2]); } }
         return;
     }
 
@@ -578,249 +462,6 @@ static void dsp_method_effects(rsx_dispatch* rsx, u32 method, u32 arg)
     default:
         break;
     }
-}
-
-/* RSX_DSP_TABLE (default 1): every word the FIFO walker hands the live
- * engine comes through here, ~150,000 a frame in God of War: Ascension's
- * combat, and most of them only set a register. After storing it, each word
- * used to run the same chain of tests -- three vertex-constant ranges, the
- * immediate-vertex methods, the two upload windows, then the switch -- to
- * find nothing to do. One byte per method, worked out once from those same
- * tests, says which words have something to do: none (return), a transform
- * constant upload (straight to it), or anything else (the chain as before).
- * Same effects in the same order for every method. RSX_DSP_TABLE=0: the chain
- * for every word. rsx_dispatch_table: -1 until the first word reads the
- * environment; tests call rsx_dispatch_set_table(0/1). */
-int rsx_dispatch_table = -1;
-enum { DSP_K_PLAIN = 0, DSP_K_CONST = 1, DSP_K_CHAIN = 2 };
-static u8 s_dsp_kind[RSX_DSP_NUM_REGS];
-static volatile int s_dsp_kind_ready;
-/* WALK2 (ascension host/walk/walk2, 2026-11-08): s_dsp_kind2 = the same table, but 0x1600-0x187F (vertex array
- * offsets/formats, FRONT_FACE, cull, index array registers, ...) are PLAIN except the four switch cases there
- * (BEGIN_END, DRAW_ARRAYS, INLINE_ARRAY, DRAW_INDEX_ARRAY): vtx_const_fold, the immediate-vertex test and the two
- * upload windows do nothing for those methods, so the effects are the same, without the test chain. The walker
- * uses s_dsp_kind_p = s_dsp_kind2 while W2_FIFO is active (rsx_dispatch_w2_set). */
-static u8 s_dsp_kind2[RSX_DSP_NUM_REGS];
-static const u8* s_dsp_kind_p = s_dsp_kind;
-
-/* Does dsp_method_effects do anything for this (masked) method? Mirrors its
- * tests one for one. */
-static u8 dsp_kind_of(u32 method)
-{
-    if ((method >= 0x1500 && method < 0x1A00) || (method >= 0x1E40 && method < 0x1E80) ||
-        (method >= 0x0A80 && method < 0x0B00))
-        return DSP_K_CHAIN;                         /* vtx_const_fold */
-    if (method == 0x1508 || method == 0x1C0C)
-        return DSP_K_CHAIN;                         /* immediate vertex */
-    if (method >= M_VP_UPLOAD_INST && method < M_VP_UPLOAD_INST + 32 * 4)
-        return DSP_K_CHAIN;                         /* program upload */
-    if (method >= M_VP_UPLOAD_CONST && method < M_VP_UPLOAD_CONST + 32 * 4)
-        return DSP_K_CONST;                         /* constant upload */
-    switch (method) {                               /* the switch's cases */
-    case M_CLEAR_BUFFERS: case M_VERTEX_BEGIN_END: case M_INLINE_ARRAY:
-    case M_VB_VERTEX_BATCH: case M_VB_INDEX_BATCH:
-    case M_GCM_FLIP_HEAD_0: case M_GCM_FLIP_HEAD_1: case M_GCM_DRIVER_FLIP:
-        return DSP_K_CHAIN;
-    default:
-        return DSP_K_PLAIN;
-    }
-}
-
-static u8 dsp_kind2_of(u32 method)
-{
-    if (method >= 0x1600 && method < 0x1880) {
-        switch (method) {
-        case M_VERTEX_BEGIN_END: case M_VB_VERTEX_BATCH: case M_INLINE_ARRAY: case M_VB_INDEX_BATCH:
-            return DSP_K_CHAIN;
-        default:
-            return DSP_K_PLAIN;
-        }
-    }
-    return dsp_kind_of(method);
-}
-
-void rsx_dispatch_set_table(int on)
-{
-    if (on && !s_dsp_kind_ready) {
-        for (u32 i = 0; i < RSX_DSP_NUM_REGS; i++) {
-            s_dsp_kind[i] = dsp_kind_of(i << 2);
-            s_dsp_kind2[i] = dsp_kind2_of(i << 2);
-        }
-        __atomic_store_n(&s_dsp_kind_ready, 1, __ATOMIC_RELEASE);
-    }
-    __atomic_store_n(&rsx_dispatch_table, on ? 1 : 0, __ATOMIC_RELEASE);
-}
-
-static int dsp_table_decide(void)
-{
-    const char* e = getenv("RSX_DSP_TABLE");
-    rsx_dispatch_set_table(!(e && e[0] == '0'));
-    return rsx_dispatch_table;
-}
-
-void rsx_dispatch_method(rsx_dispatch* rsx, u32 method, u32 arg)
-{
-    method &= 0xFFFFC;
-    const u32 idx = method >> 2;
-    /* regs[] covers methods 0..0xFFFC (subchannel bits included). A larger
-     * value is not a method -- and indexing with it wrote past regs[] into
-     * vp[] and constants[]: Tornado Outbreak's c[461] held two copies of a
-     * "load constant 461" command header, i.e. FIFO words stored as shader
-     * constants. Drop it, and say what it was. */
-    if (idx >= RSX_DSP_NUM_REGS) {
-        static int n = 0;
-        if (n++ < 8)
-            fprintf(stderr, "[rsx-dispatch] method 0x%05X (arg 0x%08X) out of range -- dropped\n",
-                    method, arg);
-        return;
-    }
-    rsx->seen[idx]++;
-    if (__builtin_expect(rsx_dsp_pso_epoch_on, 0)) dsp_pso_note(rsx, idx, arg);   /* LD_PSO_SAME */
-    rsx->regs[idx] = arg;
-    int table = rsx_dispatch_table;
-    if (__builtin_expect(table < 0, 0))
-        table = dsp_table_decide();
-    if (__builtin_expect(table, 1)) {
-        const u8 k = s_dsp_kind_p[idx];
-        if (k == DSP_K_PLAIN)
-            return;
-        if (k == DSP_K_CONST) {
-            dsp_vp_const(rsx, method, arg);
-            return;
-        }
-    }
-    dsp_method_effects(rsx, method, arg);
-}
-
-/* WALK2 (ascension host/walk/walk2, 2026-11-08): FIFO packet fast paths, called by rsx_live_draw.c under
- * W2_FIFO for a whole packet. Each has exactly the effects the per-word rsx_dispatch_method calls would have on
- * regs[], seen[], vp[], constants[] and the epochs (g_rsx_dsp_pso_epoch, _last, _stable, _vp_gen, _bind_epoch,
- * _bind_last, _raster_epoch), word by word in order, with one exception: g_rsx_dsp_const_gen moves once for a
- * constant packet that changed a constant and not at all for one that re-sent the values the constants already
- * held (the per-word path moves it for every constant word; its readers only ask "unchanged since?"). They return
- * 0 with nothing done when the packet is not of their form or the table is not in use; the caller then walks it
- * word by word. */
-static int s_w2_quiet_ok = -1;   /* NOP, the constant window + slot, the program window: pso- and bind-quiet */
-static int s_w2_constlog = -1;
-static int w2_quiet_ok(void)
-{
-    if (!rsx_dsp_pso_epoch_on) return 1;   /* dsp_pso_note not called at all */
-    if (s_w2_quiet_ok < 0) {
-        int ok = s_pso_quiet[0x0100 >> 2] && s_bind_quiet[0x0100 >> 2] == 1;
-        for (u32 m = 0x1EFC; m < 0x1F80; m += 4) ok &= s_pso_quiet[m >> 2] && s_bind_quiet[m >> 2] == 1;
-        for (u32 m = 0x0B80; m < 0x0C00; m += 4) ok &= s_pso_quiet[m >> 2] && s_bind_quiet[m >> 2] == 1;
-        s_w2_quiet_ok = ok;
-    }
-    return s_w2_quiet_ok;
-}
-void rsx_dispatch_w2_set(int on)
-{
-    if (on && rsx_dispatch_table == 1 && s_dsp_kind_ready) s_dsp_kind_p = s_dsp_kind2;
-    else s_dsp_kind_p = s_dsp_kind;
-}
-int rsx_dispatch_w2_nop_run(rsx_dispatch* rsx, u32 count, u32 last_arg)
-{
-    if (rsx_dispatch_table != 1 || !count || !w2_quiet_ok()) return 0;
-    rsx->seen[0x0100 >> 2] += count;
-    rsx->regs[0x0100 >> 2] = last_arg;
-    return 1;
-}
-int rsx_dispatch_w2_const_run(rsx_dispatch* rsx, u32 method, u32 count, const u32* args)
-{
-    if (s_w2_constlog < 0) s_w2_constlog = getenv("RSX_CONST_LOG") != NULL;
-    if (rsx_dispatch_table != 1 || s_w2_constlog || !count || !w2_quiet_ok()) return 0;
-    if (method < M_VP_UPLOAD_CONST_ID || method + (count - 1u) * 4u >= M_VP_UPLOAD_CONST + 32 * 4) return 0;
-    int changed = 0;
-    u32 m = method;
-    for (u32 i = 0; i < count; i++, m += 4) {
-        const u32 idx = m >> 2, arg = args[i];
-        rsx->seen[idx]++;
-        rsx->regs[idx] = arg;
-        if (m >= M_VP_UPLOAD_CONST) {
-            const u32 word = (m - M_VP_UPLOAD_CONST) >> 2;
-            const u32 slot = rsx->regs[M_VP_UPLOAD_CONST_ID >> 2] + (word >> 2);
-            if (slot < RSX_DSP_NUM_CONSTANTS) {
-                u32* c = &rsx->constants[slot][word & 3];
-                changed |= *c != arg;
-                *c = arg;
-            }
-        }
-    }
-    if (changed) g_rsx_dsp_const_gen++;   /* LD_CB_GEN */
-    return 1;
-}
-int rsx_dispatch_w2_prog_run(rsx_dispatch* rsx, u32 type, u32 method, u32 count, const u32* args)
-{
-    if (rsx_dispatch_table != 1 || !count || !w2_quiet_ok()) return 0;
-    const u32 step = type == 0 ? 4u : 0u;
-    if (method < M_VP_UPLOAD_INST || method + (count - 1u) * step >= M_VP_UPLOAD_INST + 32 * 4) return 0;
-    u32* load = &rsx->regs[M_VP_UPLOAD_FROM_ID >> 2];
-    u32 m = method;
-    for (u32 i = 0; i < count; i++, m += step) {
-        const u32 idx = m >> 2, arg = args[i];
-        rsx->seen[idx]++;
-        rsx->regs[idx] = arg;
-        const u32 lane = ((m - M_VP_UPLOAD_INST) >> 2) & 3;
-        const u32 pos = *load * 4 + lane;
-        if (pos < RSX_DSP_VP_WORDS) {
-            if (__builtin_expect(rsx_dsp_pso_epoch_on, 0) && rsx->vp[pos] != arg) {
-                g_rsx_dsp_pso_epoch++;   /* LD_PSO_SAME: the program changed */
-                g_rsx_dsp_vp_gen++; g_rsx_dsp_pso_stable++;   /* DRAW-COST: DRAWOPT_HEAD, DRAWOPT_PSO */
-                g_rsx_dsp_pso_last = M_VP_UPLOAD_INST >> 2;
-                g_rsx_dsp_bind_epoch++;  /* LD_DRAW_REUSE */
-            }
-            rsx->vp[pos] = arg;
-        }
-        if (lane == 3)
-            (*load)++;
-    }
-    return 1;
-}
-
-/* WALK2 cut 3b (W2_LEAN, ascension host/walk/walk2): rsx_dispatch_method with its rare work out of line. The
- * compiled rsx_dispatch_method inlines dsp_method_effects (vertex-constant folding with float code), dsp_vp_const
- * and the out-of-range report, so EVERY word pays their prologue: seven pushes, an xmm6 save and the matching
- * pops, though ~3 words in 4 are PLAIN and only store. Here the same statements in the same order, the
- * rare ones in noinline functions: the plain word is a leaf. rsx_live_draw_method calls this one under W2_LEAN. */
-__attribute__((noinline)) static void dsp_w2_bad(u32 method, u32 arg)
-{
-    static int n = 0;
-    if (n++ < 8)
-        fprintf(stderr, "[rsx-dispatch] method 0x%05X (arg 0x%08X) out of range -- dropped\n", method, arg);
-}
-__attribute__((noinline)) static void dsp_w2_changed(rsx_dispatch* rsx, u32 idx, u32 arg)
-{
-    dsp_pso_note(rsx, idx, arg);   /* regs[idx] != arg here: its counters move as in the inline test */
-}
-__attribute__((noinline)) static void dsp_w2_const(rsx_dispatch* rsx, u32 method, u32 arg)
-{
-    dsp_vp_const(rsx, method, arg);
-}
-__attribute__((noinline)) static void dsp_w2_effects(rsx_dispatch* rsx, u32 method, u32 arg)
-{
-    dsp_method_effects(rsx, method, arg);
-}
-void rsx_dispatch_method_w2(rsx_dispatch* rsx, u32 method, u32 arg)
-{
-    method &= 0xFFFFC;
-    const u32 idx = method >> 2;
-    if (__builtin_expect(idx >= RSX_DSP_NUM_REGS, 0)) { dsp_w2_bad(method, arg); return; }
-    rsx->seen[idx]++;
-    if (__builtin_expect(rsx_dsp_pso_epoch_on, 0) && rsx->regs[idx] != arg) dsp_w2_changed(rsx, idx, arg);   /* LD_PSO_SAME */
-    rsx->regs[idx] = arg;
-    int table = rsx_dispatch_table;
-    if (__builtin_expect(table < 0, 0))
-        table = dsp_table_decide();
-    if (__builtin_expect(table, 1)) {
-        const u8 k = s_dsp_kind_p[idx];
-        if (k == DSP_K_PLAIN)
-            return;
-        if (k == DSP_K_CONST) {
-            dsp_w2_const(rsx, method, arg);
-            return;
-        }
-    }
-    dsp_w2_effects(rsx, method, arg);
 }
 
 /* ---- getters ----------------------------------------------------------- */
@@ -913,7 +554,10 @@ void rsx_dsp_get_texture(const rsx_dispatch* rsx, u32 unit, rsx_dsp_texture* out
         return;
     const u32 base = M_TEX_OFFSET + unit * 0x20;
     const u32 fmt  = rsx_dsp_reg(rsx, base + 0x04);
-    out->offset    = rsx_dsp_reg(rsx, base);
+    /* The offset is 31 bits; bit 31 is not part of it (RPCS3 masks it with 0x7FFFFFFF for fragment and vertex
+     * textures). Taken whole, a main-memory texture bound at 0x82A22900 missed the IO lookup. The location comes from
+     * the format word alone. */
+    out->offset    = rsx_dsp_reg(rsx, base) & 0x7FFFFFFFu;
     out->location  = (fmt & 3) == 2 ? RSX_LOCATION_MAIN : RSX_LOCATION_LOCAL;
     out->cubemap   = (fmt >> 2) & 1;
     out->dimension = (fmt >> 4) & 0xF;
@@ -941,7 +585,7 @@ void rsx_dsp_get_vertex_texture(const rsx_dispatch* rsx, u32 unit,
         return;
     const u32 base = M_VERTEX_TEXTURE + unit * 0x20;
     const u32 fmt  = rsx_dsp_reg(rsx, base + 0x04);
-    out->offset    = rsx_dsp_reg(rsx, base + 0x00);
+    out->offset    = rsx_dsp_reg(rsx, base + 0x00) & 0x7FFFFFFFu;   /* 31-bit offset, as above */
     out->location  = (fmt & 3) == 2 ? RSX_LOCATION_MAIN : RSX_LOCATION_LOCAL;
     out->cubemap   = (fmt >> 2) & 1;
     out->dimension = (fmt >> 4) & 0xF;

@@ -1,0 +1,86 @@
+--- upstream-v0.15.0/rsx_fp_decompiler.h
++++ fork/rsx_fp_decompiler.h
+@@ -146,11 +146,43 @@
+  * success or -1 for an unterminated/truncated/oversized program. */
+ int rsx_fp_collect_constants(
+     const u8* ucode, u32 max_bytes, rsx_fp_constant_block* out);
++/* The same, writing only out->count and values[0..count): the slots past
++ * count keep whatever they held (no 32 KB clear per call). */
++int rsx_fp_collect_constants_used(
++    const u8* ucode, u32 max_bytes, rsx_fp_constant_block* out);
+ 
+ /* Canonical structural fragment-program hash. Instruction bytes and their
+  * order are hashed; inline CONST payload bytes are skipped. Returns zero for
+  * malformed input. */
+ u64 rsx_fp_structural_hash(const u8* ucode, u32 max_bytes, u64 seed);
++
++/* Nonzero when the program reads WPOS (the fragment's window position), whose
++ * origin and pixel centre SHADER_WINDOW sets. */
++int rsx_fp_uses_wpos(const u8* ucode, u32 max_bytes);
++
++/* Texture units bound to 3D (volume) textures for the next decompile: they
++ * are declared Texture3D and sampled with three coordinates. Set per draw
++ * by the caller, and part of its pipeline identity. */
++void rsx_fp_set_volume_mask(u32 mask);
++
++/* Texture units whose ADDRESS register asks for the biased unsigned remap
++ * (bits 12..15 = 1): the RSX returns sample * 2 - 1. Set per draw like the
++ * volume mask, and part of the caller's pipeline identity. */
++void rsx_fp_set_expand_mask(u32 mask);
++/* LD_FP_EXP_FLOAT (see the .c). */
++void rsx_fp_set_noexpand_mask(u32 mask);
++u32 rsx_fp_texture_exp_units(const u8* ucode, u32 max_bytes);
++
++/* Rewrite a decompiled program's WPOS reads (SV_Position, top-left origin,
++ * half-pixel centres) into the RSX window position SHADER_WINDOW describes:
++ * bits 0..11 height, 12..15 origin (1 = bottom), 16..19 centre (1 = integer).
++ * Returns the number of reads rewritten, or -1 when out_size is too small. */
++int rsx_fp_apply_shader_window(char* hlsl, u32 out_size, u32 shader_window);
++/* The same with SV_Position divided by the target's scale (inv_scale: an
++ * HLSL expression for 1 / scale; NULL: none). Rewrites every program that
++ * reads WPOS when inv_scale is given. */
++int rsx_fp_apply_shader_window_scaled(char* hlsl, u32 out_size, u32 shader_window,
++                                      const char* inv_scale);
+ 
+ /* Hash the exact legacy HLSL literal spellings (%g) for a program while also
+  * retaining structural identity. This is intended for aggregate diagnostics;
+@@ -187,6 +219,12 @@
+  * Apply before alpha-test wrapping; disabled draws should skip this helper. */
+ int rsx_fp_apply_srgb_output(char* hlsl, u32 capacity);
+ 
++/* RGB of the single colour output times `scale`, an HLSL float3 expression
++ * (a literal, or a constant the draw uploads), saturated first for a
++ * fixed-point target: a blend's source constant moved into the shader.
++ * Returns 1, or -1 without mutation (several targets, malformed source). */
++int rsx_fp_apply_output_rgb_scale(char* hlsl, u32 capacity, const char* scale, int saturate_first);
++
+ /* Gamma metadata is a post-filter/post-remap RGBA lane mask, with formats
+  * validated by rsx_texture_gamma_mask. EXP_TEX overrides gamma per fetch.
+  * Old entry points pass NULL and preserve their source byte for byte. */
+@@ -212,6 +250,26 @@
+  * the decompiler on where a program ends. */
+ u32 rsx_fp_program_size(const u8* ucode, u32 max_bytes);
+ 
++/* LD_SHADER_STATS: the opcode/modifier histogram (see the .c). The context is
++ * the register state the pipeline is built with, for the per-pipeline checks. */
++typedef struct rsx_fp_stats_ctx {
++    u32 tc2d_mask;         /* TEX_COORD_CONTROL bit 0 (2D) per texcoord 0..9 */
++    u32 centroid_mask;     /* TEX_COORD_CONTROL bit 4 (centroid) per texcoord */
++    u32 xyz_units;         /* cube and volume units (three-coordinate fetches) */
++    u32 float_units;       /* units whose format takes no BX2 expansion */
++    u32 zero_remap_units;  /* units with a channel remapped to constant zero */
++    u32 rt_count;          /* colour targets bound */
++    u32 vp_out_mask;       /* SET_VERTEX_ATTRIB_OUTPUT_MASK (0x1FF4) */
++    u32 vp_written;        /* o[] registers the vertex program writes */
++    u32 two_side;          /* TWO_SIDE_LIGHT_EN (0x142C) */
++} rsx_fp_stats_ctx;
++void rsx_fp_stats_note(const u8* ucode, u32 max_bytes, u32 ctrl, const rsx_fp_stats_ctx* ctx);
++void rsx_fp_stats_print(void);
++/* LD_FP_EXPORT_GATHER / LD_FP_ALIAS_SYNC: lanes they act on in a program. */
++u32 rsx_fp_alias_hazards(const u8* ucode, u32 max_bytes);
++/* LD_FP_MEMO_CONST: the same program apart from its inline constant values. */
++int rsx_fp_same_instructions(const u8* a, const u8* b, u32 size);
++
+ #ifdef __cplusplus
+ }
+ #endif

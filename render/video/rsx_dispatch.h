@@ -36,6 +36,10 @@ extern "C" {
 #define RSX_DSP_NUM_VERTEX_ATTR 16
 #define RSX_DSP_NUM_TEXTURES    16               /* fragment texture units   */
 
+/* ZSTENCIL_CLEAR_VALUE (0x1D8C) after a reset: depth 1.0, stencil 0 in the
+ * Z24S8 layout. The RSX puts it back at every flip as well (cellGcmSys.c). */
+#define RSX_DSP_ZSTENCIL_CLEAR_RESET 0xFFFFFF00u
+
 /* rsx_dsp_texture.format values (gcm public format byte, incl. the LN/UN
  * modifier bits: 0x20 = linear/no-swizzle, 0x40 = unnormalized coords) */
 #define RSX_TEX_FMT_B8              0x81
@@ -48,6 +52,7 @@ extern "C" {
 #define RSX_TEX_FMT_DXT45           0x88
 #define RSX_TEX_FMT_G8B8            0x8B
 #define RSX_TEX_FMT_DEPTH24_D8      0x90
+#define RSX_TEX_FMT_DEPTH16         0x92
 #define RSX_TEX_FMT_LINEAR          0x20         /* modifier: no swizzle     */
 #define RSX_TEX_FMT_UNNORM          0x40         /* modifier: texel coords   */
 #define RSX_TEX_FMT_BASE_MASK       0x9F         /* format sans modifiers    */
@@ -154,47 +159,6 @@ void rsx_dispatch_seed_transform_constants(rsx_dispatch* rsx, const u32* words, 
 
 /* Dispatch one register write. */
 void rsx_dispatch_method(rsx_dispatch* rsx, u32 method, u32 arg);
-/* RSX_DSP_TABLE (rsx_dispatch.c): -1 until the first method reads the
- * environment, then 1 (method-kind table, default) or 0 (the test chain for
- * every method). rsx_dispatch_set_table(0/1) overrides it (tests). */
-extern int rsx_dispatch_table;
-/* LD_PSO_SAME (rsx_live_draw.c): once rsx_dispatch_pso_epoch_enable() has
- * run, g_rsx_dsp_pso_epoch counts every change of a value the live draw's
- * pipeline choice can read -- a register write that changes the register
- * (except the few rsx_dispatch.c lists as never read there: semaphores,
- * reports, draw/index methods, vertex array and texture offsets, constant
- * uploads), a transform program word that changes, a seed. Off (the default):
- * one predictable branch per method, nothing counted. */
-extern int rsx_dsp_pso_epoch_on;
-extern unsigned g_rsx_dsp_pso_epoch;
-extern unsigned g_rsx_dsp_pso_last;
-/* Counts every transform-constant write (upload window, seed): the live
- * draw's "constants unchanged since the last block" test (LD_CB_GEN). */
-extern unsigned g_rsx_dsp_const_gen;
-extern unsigned g_rsx_dsp_bind_epoch;   /* LD_DRAW_REUSE: binding-relevant register changes */
-extern unsigned g_rsx_dsp_bind_last;
-extern unsigned g_rsx_dsp_raster_epoch;   /* LD_DRAW_REUSE: cull mode / winding changes */
-extern unsigned g_rsx_dsp_vp_gen;              /* DRAW-COST: transform program words or start changed */
-/* DRAW-COST (DRAWOPT_PSO): g_rsx_dsp_pso_epoch without the volatile registers.
- * Like the other epochs, a split of the FIFO walk (WALK_PIPE) must hand the
- * draw side the values these counters had at that draw (g_rsx_dsp_vp_gen too). */
-extern unsigned g_rsx_dsp_pso_stable;
-void rsx_dispatch_bind_quiet(u32 lo, u32 hi);   /* registers the reuse checks another way */
-void rsx_dispatch_pso_epoch_enable(void);
-/* Registers [lo, hi] (method offsets) stop counting too: the live draw knows
- * its pipeline choice does not read them (LD_PSO_SAME_QUIET). */
-void rsx_dispatch_pso_quiet(u32 lo, u32 hi);
-u32 rsx_dispatch_pso_unpinned(u32* idx, u32 max);   /* DRAW-COST: pipeline inputs a binding reuse does not pin */
-void rsx_dispatch_pso_volatile(u32 lo, u32 hi);    /* DRAW-COST: not counted in g_rsx_dsp_pso_stable */
-void rsx_dispatch_set_table(int on);
-/* WALK2 (ascension host/walk/walk2): FIFO packet fast paths + the tighter kind table (rsx_dispatch.c). */
-void rsx_dispatch_w2_set(int on);
-int rsx_dispatch_w2_nop_run(rsx_dispatch* rsx, u32 count, u32 last_arg);
-int rsx_dispatch_w2_const_run(rsx_dispatch* rsx, u32 method, u32 count, const u32* args);
-int rsx_dispatch_w2_prog_run(rsx_dispatch* rsx, u32 type, u32 method, u32 count, const u32* args);
-/* WALK2 cut 3b (W2_LEAN): rsx_dispatch_method with the rare work out of line (same effects). */
-void rsx_dispatch_method_w2(rsx_dispatch* rsx, u32 method, u32 arg);
-
 
 /* ---- decoded state getters -------------------------------------------- */
 
@@ -263,6 +227,17 @@ u32 rsx_dsp_vertex_data_base_index(const rsx_dispatch* rsx);
 static inline u32 rsx_dsp_resolve_vertex_index(u32 index, u32 base_index)
 {
     return (index + base_index) & 0x000FFFFFu;
+}
+
+/* VERTEX_DATA_BASE_OFFSET is added to an array's offset and the sum is taken
+ * modulo 2^28 (the size of a location's address space) before it is
+ * translated through the array's location, for local and main memory alike.
+ * Resistance: Fall of Man relies on the wrap: its world lighting stream sits
+ * at base + offset = 0x1Fxxxxxx, which is local 0x0Fxxxxxx. The element
+ * offset (index * stride) is added after the mask. */
+static inline u32 rsx_dsp_resolve_vertex_offset(u32 base_offset, u32 array_offset)
+{
+    return (base_offset + array_offset) & 0x0FFFFFFFu;
 }
 
 /* Index array state (IDXBUF_OFFSET / IDXBUF_FORMAT) */

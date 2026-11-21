@@ -30,23 +30,7 @@
  */
 #include "rsx_vp_decompiler.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-
-/* LD_VP_CC_EITHER (default on): an instruction whose vector or scalar unit
- * has no destination (no temp, no output) writes its result to the condition
- * register when EITHER update bit (D0 bit 14 or 29) is set (RPCS3
- * VertexProgramDecompiler::SetDST). Only both bits were honoured, and only for
- * the vector unit: God of War: Ascension's level programs carry such writes
- * with bit 14 alone (3 of the 39 condition-only writes in the shader stats),
- * so the branches and predicated writes after them read a stale condition.
- * Text is unchanged for every other instruction. =0: as before. */
-static int vp_cc_either_on(void)
-{
-    static int on = -1;
-    if (on < 0) { const char* e = getenv("LD_VP_CC_EITHER"); on = !(e && e[0] == '0'); }
-    return on;
-}
 
 /* ---- little-endian word read (RPCS3-capture native order) --------------- */
 static u32 rd_le(const u8* p)
@@ -148,10 +132,26 @@ static void emit_store(Out* b, const char* dst_fmt, u32 idx, const char* m)
 }
 
 /* ---- flow control -------------------------------------------------------- */
-#define RSX_VP_MAX_INSTR 512
+/* The transform program memory holds 544 slots (RSX_DSP_VP_INSTR), not 512:
+ * a branch target or block leader past slot 511 must still open a block. */
+#define RSX_VP_MAX_INSTR 544
 
 static u32 s_vp_branch_base = 0;   /* VP slot the program being decompiled starts at */
 void rsx_vp_set_branch_base(u32 start_slot) { s_vp_branch_base = start_slot; }
+
+static u32 s_vp_branch_bits = 0;   /* SET_TRANSFORM_BRANCH_BITS, tested by BRB/CLB */
+void rsx_vp_set_branch_bits(u32 bits) { s_vp_branch_bits = bits; }
+
+int rsx_vp_uses_branch_bits(const u8* ucode, u32 max_bytes)
+{
+    if (!ucode) return 0;
+    for (u32 off = 0; off + 16 <= max_bytes; off += 16) {
+        const u32 sca_op = (rd_le(ucode + off + 4) >> 27) & 0x1Fu;
+        if (sca_op == 0x11 || sca_op == 0x12) return 1;   /* BRB, CLB */
+        if (rd_le(ucode + off + 12) & 1u) break;          /* D3.end */
+    }
+    return 0;
+}
 
 /* BRA BRI CAL CLI RET BRB CLB (scalar opcodes). */
 static int vp_is_flow(u32 sca_op)
@@ -281,7 +281,7 @@ int rsx_vp_analyze_inputs(const u8* ucode, u32 max_bytes,
 
 static int rsx_vp_decompile_impl(
     const u8* ucode, u32 max_bytes, u32 vtex_mask, int compact_inputs,
-    u32 input_mask, const u8* raw_kind, char* out, u32 out_size);
+    u32 input_mask, char* out, u32 out_size);
 
 int rsx_vp_decompile(const u8* ucode, u32 max_bytes, char* out, u32 out_size)
 {
@@ -292,7 +292,7 @@ int rsx_vp_decompile_ex(const u8* ucode, u32 max_bytes, u32 vtex_mask,
                         char* out, u32 out_size)
 {
     return rsx_vp_decompile_impl(
-        ucode, max_bytes, vtex_mask, 0, 0xFFFFu, NULL, out, out_size);
+        ucode, max_bytes, vtex_mask, 0, 0xFFFFu, out, out_size);
 }
 
 int rsx_vp_decompile_compact_ex(
@@ -307,62 +307,12 @@ int rsx_vp_decompile_compact_ex(
     else
         input_mask = analysis.input_mask;
     return rsx_vp_decompile_impl(
-        ucode, max_bytes, vtex_mask, 1, input_mask, NULL, out, out_size);
+        ucode, max_bytes, vtex_mask, 1, input_mask, out, out_size);
 }
-
-int rsx_vp_decompile_compact_raw_ex(
-    const u8* ucode, u32 max_bytes, u32 vtex_mask, u32 input_mask,
-    const u8 raw_kind[16], char* out, u32 out_size)
-{
-    if (!raw_kind)
-        return -1;
-    rsx_vp_input_analysis analysis;
-    if (rsx_vp_analyze_inputs(ucode, max_bytes, &analysis) < 0 ||
-        !analysis.exact ||
-        (analysis.input_mask & ~(input_mask & 0xFFFFu)) != 0)
-        input_mask = 0xFFFFu;   /* as the compact variant: all 16, the layout has them */
-    else
-        input_mask = analysis.input_mask;
-    return rsx_vp_decompile_impl(
-        ucode, max_bytes, vtex_mask, 1, input_mask, raw_kind, out, out_size);
-}
-
-/* LD_VTX_RAW: the guest's attribute bytes, as little-endian words, back to
- * the float4 rsx_vertex_decode_element makes of them. t is the RSX type
- * (1 s16n, 2 f32, 3 f16, 4 u8n, 5 s16, 6 cmp, 7 u8), n the size; both are
- * literals at every call, so the branches fold. Half: exponent 0 is a signed
- * zero, as rsx_compact_be_f16 has it. */
-static const char k_vp_raw_decode[] =
-    "uint vb_sw(uint w) { return (w >> 24) | ((w >> 8) & 0xFF00u) | ((w << 8) & 0xFF0000u) | (w << 24); }\n"
-    "uint vb_h(uint4 w, uint c) { uint x = w[c >> 1];"
-    " return (c & 1u) ? ((((x >> 16) & 0xFFu) << 8) | (x >> 24)) : (((x & 0xFFu) << 8) | ((x >> 8) & 0xFFu)); }\n"
-    "uint vb_b(uint4 w, uint c) { return (w[c >> 2] >> ((c & 3u) * 8u)) & 0xFFu; }\n"
-    "float vb_f16(uint h) { uint s = (h >> 15) << 31; uint e = (h >> 10) & 31u; uint m = h & 1023u;"
-    " return asfloat(e == 0u ? s : (e == 31u ? (s | 0x7F800000u | (m << 13)) : (s | ((e + 112u) << 23) | (m << 13)))); }\n"
-    "float vb_s16(uint h) { return (float)(asint(h << 16) >> 16); }\n"
-    "float4 vdec(uint4 w, uint t, uint n) {\n"
-    "    if (t == 6u) { uint x = vb_sw(w.x);\n"
-    "        return float4((float)(asint(x << 21) >> 21) / 1023.0, (float)(asint(x << 10) >> 21) / 1023.0,\n"
-    "                      (float)(asint(x) >> 22) / 511.0, 1.0); }\n"
-    "    float4 o = float4(0, 0, 0, 1);\n"
-    "    [unroll] for (uint c = 0u; c < 4u; c++) {\n"
-    "        if (c < n) {\n"
-    "            float v = 0.0;\n"
-    "            if (t == 2u) v = asfloat(vb_sw(w[c]));\n"
-    "            else if (t == 3u) v = vb_f16(vb_h(w, c));\n"
-    "            else if (t == 1u) v = vb_s16(vb_h(w, c)) / 32767.0;\n"
-    "            else if (t == 5u) v = vb_s16(vb_h(w, c));\n"
-    "            else if (t == 4u) v = (float)vb_b(w, c) / 255.0;\n"
-    "            else if (t == 7u) v = (float)vb_b(w, c);\n"
-    "            o[c] = v;\n"
-    "        }\n"
-    "    }\n"
-    "    return o;\n"
-    "}\n";
 
 static int rsx_vp_decompile_impl(
     const u8* ucode, u32 max_bytes, u32 vtex_mask, int compact_inputs,
-    u32 input_mask, const u8* raw_kind, char* out, u32 out_size)
+    u32 input_mask, char* out, u32 out_size)
 {
     if (!ucode || !out || out_size < 256) return -1;
 
@@ -464,7 +414,6 @@ static int rsx_vp_decompile_impl(
         cc.swz[0] = SWZ[(d0 >> 8) & 3]; cc.swz[1] = SWZ[(d0 >> 6) & 3];
         cc.swz[2] = SWZ[(d0 >> 4) & 3]; cc.swz[3] = SWZ[(d0 >> 2) & 3];
         const int cc_update = ((d0 >> 14) & 1) && ((d0 >> 29) & 1);
-        const int cc_either = vp_cc_either_on() && (((d0 >> 14) & 1) || ((d0 >> 29) & 1));
         if (cc.test) n_cond_skipped++;
 
         /* ---- vector ALU ---- */
@@ -531,7 +480,7 @@ static int rsx_vp_decompile_impl(
                     emit_store_cc(&b, "o[%u]", dst_out & 15, m, &cc);
                 if (dst_tmp != 0x3F)
                     emit_store_cc(&b, "r[%u]", dst_tmp & 31, m, &cc);
-                if (cc_update || (cc_either && !(vec_result && dst_out != 0x1F) && dst_tmp == 0x3F))
+                if (cc_update)
                     emit_store_cc(&b, "cc[%u]", cc.sel, m, &cc);
                 emit(&b, "    }\n");
             }
@@ -567,10 +516,20 @@ static int rsx_vp_decompile_impl(
                 snprintf(flow_term, sizeof flow_term,
                          "        if (%s) { if (_csp > 0) { _csp--; _pc = _cs[_csp]; } else _pc = -1; } else _pc = %d;\n",
                          c, next);
-            else {                                         /* BRB/CLB: boolean-register branches */
-                n_flow_skipped++;
-                snprintf(flow_term, sizeof flow_term,
-                         "        _pc = %d; /* TODO: %s not modelled */\n", next, rsx_vp_sca_name(sca_op));
+            else {                                         /* BRB, CLB */
+                /* A boolean branch tests bit D3[23:27] of the transform
+                 * branch bits against D3[28] and ignores the CC condition
+                 * (RPCS3's GetOptionalBranchCond). The bits are baked in:
+                 * the caller keys the program on them. */
+                const u32 bit = (s_vp_branch_bits >> ((d3 >> 23) & 0x1Fu)) & 1u;
+                const int taken = bit == ((d3 >> 28) & 1u);
+                if (!taken)
+                    snprintf(flow_term, sizeof flow_term, "        _pc = %d;\n", next);
+                else if (sca_op == 0x11)
+                    snprintf(flow_term, sizeof flow_term, "        _pc = %u;\n", tgt);
+                else
+                    snprintf(flow_term, sizeof flow_term,
+                             "        _cs[_csp] = %d; _csp = min(_csp + 1, 7); _pc = %u;\n", next, tgt);
             }
         }
         /* ---- scalar ALU (reads SRC2) ---- */
@@ -611,9 +570,6 @@ static int rsx_vp_decompile_impl(
                     emit_store_cc(&b, "o[%u]", dst_out & 15, m, &cc);
                 if (sca_dst_tmp != 0x3F)
                     emit_store_cc(&b, "r[%u]", sca_dst_tmp & 31, m, &cc);
-                /* LD_VP_CC_EITHER: a scalar result with nowhere else to go. */
-                if (cc_either && !(!vec_result && dst_out != 0x1F) && sca_dst_tmp == 0x3F)
-                    emit_store_cc(&b, "cc[%u]", cc.sel, m, &cc);
                 emit(&b, "    }\n");
             }
         }
@@ -649,8 +605,7 @@ static int rsx_vp_decompile_impl(
             if (!(input_mask & (1u << attr))) continue;
             char declaration[64];
             snprintf(declaration, sizeof(declaration),
-                     raw_kind && raw_kind[attr] ? "    uint4 a%u:ATTR%u;\n" : "    float4 a%u:ATTR%u;\n",
-                     attr, attr);
+                     "    float4 a%u:ATTR%u;\n", attr, attr);
             emit(&o, declaration);
         }
         emit(&o, "};\n");
@@ -662,6 +617,7 @@ static int rsx_vp_decompile_impl(
         "    float4 t0:TEXCOORD0; float4 t1:TEXCOORD1; float4 t2:TEXCOORD2; float4 t3:TEXCOORD3;\n"
         "    float4 t4:TEXCOORD4; float4 t5:TEXCOORD5; float4 t6:TEXCOORD6; float4 t7:TEXCOORD7;\n"
         "    float4 t8:TEXCOORD8; float4 t9:TEXCOORD9;\n"
+        RSX_VP_HLSL_PSIZE_MEMBER
         "};\n"
         /* b0: 512 vec4 transform constants + the RSX viewport transform,
          * pre-mapped by the harness to D3D clip space:
@@ -670,7 +626,9 @@ static int rsx_vp_decompile_impl(
         "    float4 vp_c[512];\n"
         "    float4 vp_posscale;\n"
         "    float4 vp_posoffset;\n"
+        RSX_VP_HLSL_PSIZE_ROW
         "};\n"
+        RSX_VP_HLSL_PSIZE_FUNC
         /* NV vertex programs multiply by the legacy rule: 0 times anything,
          * INF and NaN included, is 0. IEEE gives NaN, and one RCP of a zero
          * distance then poisons a whole lighting sum -- Tornado Outbreak's UI
@@ -683,8 +641,6 @@ static int rsx_vp_decompile_impl(
         "float vp_dot3(float4 a, float4 b) { float4 m = vp_mul(a, b); return m.x + m.y + m.z; }\n"
         "float vp_dot4(float4 a, float4 b) { float4 m = vp_mul(a, b); return m.x + m.y + m.z + m.w; }\n");
 
-    if (raw_kind)
-        emit(&o, k_vp_raw_decode);
     for (u32 vtu = 0; vtu < 4; vtu++) {
         if (!((vtex_mask >> vtu) & 1u)) continue;
         char decl[128];
@@ -709,13 +665,9 @@ static int rsx_vp_decompile_impl(
             "    [unroll] for (int _k=0;_k<16;_k++) v[_k]=float4(0,0,0,1);\n");
         for (u32 attr = 0; attr < 16; attr++) {
             if (!(input_mask & (1u << attr))) continue;
-            char assignment[96];
-            if (raw_kind && raw_kind[attr])
-                snprintf(assignment, sizeof(assignment), "    v[%u]=vdec(input.a%u, %uu, %uu);\n",
-                         attr, attr, (u32)raw_kind[attr] >> 3, (u32)raw_kind[attr] & 7u);
-            else
-                snprintf(assignment, sizeof(assignment),
-                         "    v[%u]=input.a%u;\n", attr, attr);
+            char assignment[64];
+            snprintf(assignment, sizeof(assignment),
+                     "    v[%u]=input.a%u;\n", attr, attr);
             emit(&o, assignment);
         }
     }
@@ -733,7 +685,9 @@ static int rsx_vp_decompile_impl(
     if (has_flow) emit(&o, "    }\n");
 
     /* Output register map (see header comment): o0 = HPOS through the RSX
-     * viewport transform, o1/o2 = colors, o5.x = fog, o7..o14 = TEX0..7. */
+     * viewport transform, o1/o2 = colors, o5.x = fog, o7..o14 = TEX0..7,
+     * o15 = TEX8, o6 = TEX9 (RPCS3's reg_table: TEX9 shares the point-size
+     * register). */
     emit(&o,
         "    VSOutput Out;\n"
         "    float4 _p = o[0];\n"
@@ -741,10 +695,10 @@ static int rsx_vp_decompile_impl(
         "    Out.col0 = o[1]; Out.col1 = o[2]; Out.fog = o[5].xxxx;\n"
         "    Out.t0=o[7];  Out.t1=o[8];  Out.t2=o[9];  Out.t3=o[10];\n"
         "    Out.t4=o[11]; Out.t5=o[12]; Out.t6=o[13]; Out.t7=o[14];\n"
-        /* TEX8 is output 15, TEX9 output 6 (beside the point size). God of
-         * War: Ascension's amber and terrain materials read TEX8 (a normalised
-         * light vector): unplumbed it was zero and their N.L terms with it. */
         "    Out.t8=o[15]; Out.t9=o[6];\n"
+        /* o6.x is also the point size when output mask bit 5 is set
+         * (vp_pointsize.y; see rsx_vp_decompiler.h). */
+        RSX_VP_HLSL_PSIZE_STORE("o[6].x")
         "    return Out;\n"
         "}\n");
 
@@ -754,184 +708,40 @@ static int rsx_vp_decompile_impl(
     return instrs;
 }
 
-/* ---- LD_SHADER_STATS: which opcodes and modifiers the title's programs use --
- * Called by the live draw once per pipeline it builds (only when
- * LD_SHADER_STATS is set); counted once per distinct program, as
- * "occurrences/programs". Returns the output registers o0..o15 the program
- * writes (bit n = o[n]), for the fragment-side checks. Nothing here touches
- * the generated text. */
-enum {
-    VPS_SAT, VPS_PRED, VPS_COND0_NOTEST, VPS_CC_UPD14, VPS_CC_UPD29, VPS_CC_UPD_BOTH,
-    VPS_CC_UPD_WITH_DEST, VPS_CC_UPD_NO_DEST, VPS_CC_SEL1, VPS_INDEX_CONST, VPS_ADDR_SWZ_NOT_X,
-    VPS_ADDR_SEL1, VPS_ARL_DST_NE_SEL, VPS_ARL_TO_OUTPUT, VPS_ABS, VPS_NEG, VPS_SRC_TYPE0,
-    VPS_CONST_GE468, VPS_VEC_DOUBLE_WRITE, VPS_SCA_TO_OUTPUT, VPS_DUAL_ISSUE, VPS_DST_GE16,
-    VPS_FLOW, VPS_FLOW_NOTEST_COND, VPS_NO_DEST,
-    VPS_NFLAGS
-};
-static const char* const vps_flag_names[VPS_NFLAGS] = {
-    "sat", "predicated", "cond0_without_test", "cc_update_bit14_only", "cc_update_bit29_only",
-    "cc_update_both", "cc_update_with_dest", "cc_update_no_dest", "cc_sel_cc1", "index_const",
-    "addr_swz_not_x", "addr_sel_a1", "arl_dst_ne_addr_sel", "arl_to_output", "abs", "neg",
-    "src_type0", "const_ge_468", "vec_double_write", "sca_to_output", "vec_and_sca",
-    "dst_ge_16", "flow", "flow_cond_untested", "no_dest"
-};
-#define VPS_SEEN 4096
-static struct {
-    u32 programs, psos, instructions, seen_full;
-    unsigned long long vec_occ[32], sca_occ[32], fl_occ[VPS_NFLAGS], in_occ[16], out_occ[16];
-    u32 vec_prog[32], sca_prog[32], fl_prog[VPS_NFLAGS], in_prog[16], out_prog[16];
-    u64 seen[VPS_SEEN];
-} s_vps;
-
-u32 rsx_vp_stats_note(const u8* ucode, u32 max_bytes)
+/* See rsx_vp_decompiler.h. The distances go after the last declared output,
+ * so the user varyings keep their locations. */
+int rsx_vp_apply_user_clip(char* hlsl, size_t cap, u32 ops)
 {
-    if (!ucode) return 0;
-    s_vps.psos++;
-    u64 h = 1469598103934665603ull;
-    {
-        const u32 n = rsx_vp_program_size_instrs(ucode, max_bytes);
-        for (u32 i = 0; i < n * 16u; i++) { h ^= ucode[i]; h *= 1099511628211ull; }
-        if (!h) h = 1;
+    if (!ops) return 0;
+    if (!hlsl) return -1;
+    static const char decl_at[] = "    float4 t8:TEXCOORD8; float4 t9:TEXCOORD9;\n";
+    static const char ret_at[] = "    return Out;\n";
+    char* d = strstr(hlsl, decl_at);
+    char* r = NULL;
+    for (char* q = strstr(hlsl, ret_at); q; q = strstr(q + 1, ret_at)) r = q;
+    if (!d || !r || r < d) return -1;
+    const int hi = (ops >> 8) != 0;   /* planes 4/5 */
+    char decl[128], body[512];
+    snprintf(decl, sizeof decl, "    float4 clipd0:SV_ClipDistance0;%s\n",
+             hi ? " float2 clipd1:SV_ClipDistance1;" : "");
+    static const char* comp[6] = { "o[5].y", "o[5].z", "o[5].w", "o[6].y", "o[6].z", "o[6].w" };
+    char lane[6][48];
+    for (u32 p = 0; p < 6; p++) {
+        const u32 op = (ops >> (p * 2u)) & 3u;
+        if (op == 2u)      snprintf(lane[p], sizeof lane[p], "%s", comp[p]);
+        else if (op == 1u) snprintf(lane[p], sizeof lane[p], "-(%s)", comp[p]);
+        else               snprintf(lane[p], sizeof lane[p], "0.5");
     }
-    int fresh = 0;
-    {
-        u32 slot = (u32)(h ^ (h >> 31)) & (VPS_SEEN - 1u), n = 0;
-        while (s_vps.seen[slot] && s_vps.seen[slot] != h && n < VPS_SEEN) {
-            slot = (slot + 1u) & (VPS_SEEN - 1u); n++;
-        }
-        if (n >= VPS_SEEN) s_vps.seen_full++;
-        else if (!s_vps.seen[slot]) { s_vps.seen[slot] = h; fresh = 1; }
-    }
-    u32 vec_seen = 0, sca_seen = 0, fl_seen = 0, in_seen = 0, out_written = 0;
-#define VPS_FLAG(f) do { if (fresh) { s_vps.fl_occ[f]++; fl_seen |= 1u << (f); } } while (0)
-    u32 off = 0;
-    while (off + 16 <= max_bytes) {
-        const u32 d0 = rd_le(ucode + off + 0), d1 = rd_le(ucode + off + 4);
-        const u32 d2 = rd_le(ucode + off + 8), d3 = rd_le(ucode + off + 12);
-        off += 16;
-        if (fresh) s_vps.instructions++;
-        const u32 vec_op = (d1 >> 22) & 0x1Fu, sca_op = (d1 >> 27) & 0x1Fu;
-        const u32 vmask = (d3 >> 13) & 0xFu, smask = (d3 >> 17) & 0xFu;
-        const int vec_on = vmask && vec_op, sca_on = smask && sca_op;
-        const int flow = vp_is_flow(sca_op);
-        const u32 dst_out = (d3 >> 2) & 0x1Fu, dst_tmp = (d0 >> 15) & 0x3Fu;
-        const u32 sca_tmp = (d3 >> 7) & 0x3Fu;
-        const int vec_result = (d0 >> 30) & 1u, cond_test = (d0 >> 13) & 1u;
-        const u32 cond = (d0 >> 10) & 7u;
-        if (vec_on && fresh) { s_vps.vec_occ[vec_op]++; vec_seen |= 1u << vec_op; }
-        if ((sca_on || flow) && fresh) { s_vps.sca_occ[sca_op]++; sca_seen |= 1u << sca_op; }
-        if (!vec_on && !sca_on && !flow) { if (d3 & 1u) break; continue; }
-        if ((d0 >> 26) & 1u) VPS_FLAG(VPS_SAT);
-        if (cond_test && cond != 7) VPS_FLAG(VPS_PRED);
-        if (!cond_test && cond == 0) VPS_FLAG(VPS_COND0_NOTEST);
-        { const int u14 = (d0 >> 14) & 1u, u29 = (d0 >> 29) & 1u;
-          if (u14 && u29) VPS_FLAG(VPS_CC_UPD_BOTH);
-          else if (u14) VPS_FLAG(VPS_CC_UPD14);
-          else if (u29) VPS_FLAG(VPS_CC_UPD29);
-          if (u14 || u29) {
-              const int dest = (vec_on && ((vec_result && dst_out != 0x1Fu) || dst_tmp != 0x3Fu)) ||
-                               (sca_on && ((!vec_result && dst_out != 0x1Fu) || sca_tmp != 0x3Fu));
-              VPS_FLAG(dest ? VPS_CC_UPD_WITH_DEST : VPS_CC_UPD_NO_DEST);
-              if ((d0 >> 25) & 1u) VPS_FLAG(VPS_CC_SEL1);
-          } else if (cond_test && cond != 7 && ((d0 >> 25) & 1u)) VPS_FLAG(VPS_CC_SEL1); }
-        if (flow) {
-            VPS_FLAG(VPS_FLOW);
-            if (!cond_test && cond != 7) VPS_FLAG(VPS_FLOW_NOTEST_COND);
-        }
-        if (vec_on && sca_on) VPS_FLAG(VPS_DUAL_ISSUE);
-        if (vec_on && vec_result && dst_out != 0x1Fu && dst_tmp != 0x3Fu && vec_op != 0x0D)
-            VPS_FLAG(VPS_VEC_DOUBLE_WRITE);
-        if (sca_on && !vec_result && dst_out != 0x1Fu) VPS_FLAG(VPS_SCA_TO_OUTPUT);
-        if (vec_on && vec_op == 0x0D) {
-            if (dst_tmp != ((d0 >> 24) & 1u)) VPS_FLAG(VPS_ARL_DST_NE_SEL);
-            if (vec_result && dst_out != 0x1Fu) VPS_FLAG(VPS_ARL_TO_OUTPUT);
-        }
-        if ((vec_on && vec_op != 0x0D && !(vec_result && dst_out != 0x1Fu) && dst_tmp == 0x3Fu) ||
-            (sca_on && !(!vec_result && dst_out != 0x1Fu) && sca_tmp == 0x3Fu))
-            VPS_FLAG(VPS_NO_DEST);
-        if (dst_out != 0x1Fu && dst_out > 15u &&
-            ((vec_on && vec_result) || (sca_on && !vec_result))) VPS_FLAG(VPS_DST_GE16);
-        if (dst_out != 0x1Fu && dst_out <= 15u &&
-            ((vec_on && vec_result) || (sca_on && !vec_result)))
-            out_written |= 1u << dst_out;
-        int exact = 1;
-        u32 use = 0;
-        if (vec_on) use |= vec_source_use(vec_op, &exact);
-        if (sca_on) use |= sca_source_use(sca_op, &exact);
-        const u32 src[3] = { ((d2 >> 23) & 0x1FFu) | ((d1 & 0xFFu) << 9), (d2 >> 6) & 0x1FFFFu,
-                             ((d3 >> 21) & 0x7FFu) | ((d2 & 0x3Fu) << 11) };
-        int uses_const = 0;
-        for (u32 si = 0; si < 3; si++) {
-            if (!(use & (1u << si))) continue;
-            const u32 type = src[si] & 3u;
-            if (type == 0) VPS_FLAG(VPS_SRC_TYPE0);
-            if (type == 2) {
-                const u32 in = (d1 >> 8) & 0xFu;
-                if (fresh) s_vps.in_occ[in]++;
-                in_seen |= 1u << in;
-            }
-            if (type == 3) uses_const = 1;
-            if ((d0 >> (21 + si)) & 1u) VPS_FLAG(VPS_ABS);
-            if ((src[si] >> 16) & 1u) VPS_FLAG(VPS_NEG);
-        }
-        if (uses_const) {
-            if ((d3 >> 1) & 1u) {
-                VPS_FLAG(VPS_INDEX_CONST);
-                if (d0 & 3u) VPS_FLAG(VPS_ADDR_SWZ_NOT_X);
-                if ((d0 >> 24) & 1u) VPS_FLAG(VPS_ADDR_SEL1);
-            } else if (((d1 >> 12) & 0x3FFu) >= 468u) VPS_FLAG(VPS_CONST_GE468);
-        }
-        if (d3 & 1u) break;
-    }
-#undef VPS_FLAG
-    if (fresh) {
-        s_vps.programs++;
-        for (u32 i = 0; i < 32; i++) {
-            if ((vec_seen >> i) & 1u) s_vps.vec_prog[i]++;
-            if ((sca_seen >> i) & 1u) s_vps.sca_prog[i]++;
-            if (i < VPS_NFLAGS && ((fl_seen >> i) & 1u)) s_vps.fl_prog[i]++;
-        }
-        for (u32 i = 0; i < 16; i++) {
-            if ((in_seen >> i) & 1u) s_vps.in_prog[i]++;
-            if ((out_written >> i) & 1u) { s_vps.out_prog[i]++; s_vps.out_occ[i]++; }
-        }
-    }
-    return out_written;
-}
-
-void rsx_vp_stats_print(void)
-{
-    FILE* f = stderr;
-    fprintf(f, "[shader-stats] vp programs=%u instructions=%u pipelines=%u seen_full=%u"
-               " (counts: occurrences/programs)\n",
-            s_vps.programs, s_vps.instructions, s_vps.psos, s_vps.seen_full);
-    char line[1024]; int n = 0;
-    line[0] = '\0';
-    for (u32 i = 0; i < 32; i++)
-        if (s_vps.vec_occ[i])
-            n += snprintf(line + n, sizeof line - (size_t)n, " %s=%llu/%u",
-                          rsx_vp_vec_name(i), s_vps.vec_occ[i], s_vps.vec_prog[i]);
-    fprintf(f, "[shader-stats] vp vec ops:%s\n", line);
-    n = 0; line[0] = '\0';
-    for (u32 i = 0; i < 32; i++)
-        if (s_vps.sca_occ[i])
-            n += snprintf(line + n, sizeof line - (size_t)n, " %s=%llu/%u",
-                          rsx_vp_sca_name(i), s_vps.sca_occ[i], s_vps.sca_prog[i]);
-    fprintf(f, "[shader-stats] vp sca ops:%s\n", line);
-    n = 0; line[0] = '\0';
-    for (u32 i = 0; i < VPS_NFLAGS; i++)
-        if (s_vps.fl_occ[i])
-            n += snprintf(line + n, sizeof line - (size_t)n, " %s=%llu/%u",
-                          vps_flag_names[i], s_vps.fl_occ[i], s_vps.fl_prog[i]);
-    fprintf(f, "[shader-stats] vp flags:%s\n", line);
-    n = 0; line[0] = '\0';
-    for (u32 i = 0; i < 16; i++)
-        if (s_vps.in_occ[i])
-            n += snprintf(line + n, sizeof line - (size_t)n, " v%u=%llu/%u", i, s_vps.in_occ[i], s_vps.in_prog[i]);
-    fprintf(f, "[shader-stats] vp inputs:%s\n", line);
-    n = 0; line[0] = '\0';
-    for (u32 i = 0; i < 16; i++)
-        if (s_vps.out_prog[i])
-            n += snprintf(line + n, sizeof line - (size_t)n, " o%u=%u", i, s_vps.out_prog[i]);
-    fprintf(f, "[shader-stats] vp outputs written (programs):%s\n", line);
+    int n = snprintf(body, sizeof body, "    Out.clipd0 = float4(%s, %s, %s, %s);\n",
+                     lane[0], lane[1], lane[2], lane[3]);
+    if (hi) snprintf(body + n, sizeof body - (size_t)n, "    Out.clipd1 = float2(%s, %s);\n", lane[4], lane[5]);
+    const size_t len = strlen(hlsl), dl = strlen(decl), bl = strlen(body);
+    if (len + dl + bl + 1 > cap) return -1;
+    const size_t doff = (size_t)(d - hlsl) + sizeof decl_at - 1, roff = (size_t)(r - hlsl);
+    /* The body first (it is further on), then the declaration. */
+    memmove(hlsl + roff + bl, hlsl + roff, len - roff + 1);
+    memcpy(hlsl + roff, body, bl);
+    memmove(hlsl + doff + dl, hlsl + doff, len + bl - doff + 1);
+    memcpy(hlsl + doff, decl, dl);
+    return 0;
 }
