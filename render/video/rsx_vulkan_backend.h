@@ -34,7 +34,7 @@
  *                             order) instead of the first non-CPU device.
  *   PS3RECOMP_VK_DUMP=<path>  write every presented frame to <path> as a
  *                             binary PPM (overwritten each present).
- *   PS3RECOMP_VK_WINDOW=1     also show each presented frame in an SDL2
+ *   PS3RECOMP_VK_WINDOW=1     also show each presented frame in an SDL2 (Win32 on Windows)
  *                             window. Rendering and readback are unchanged, so
  *                             every test gives the same result with or without
  *                             it; if the window cannot be opened the run
@@ -68,12 +68,37 @@ int  rsx_vulkan_backend_init(u32 width, u32 height, const char* title);
 /* Unregister and destroy every Vulkan object, then unload the library. */
 void rsx_vulkan_backend_shutdown(void);
 
-/* Headless: always 0. Windowed: drains SDL's event queue; -1 once the
+/* Headless: always 0. Windowed: drains the window's events (SDL2, or the
+ * Win32 message queue of the thread that called init); -1 once the
  * window has been closed or Esc pressed. */
 int  rsx_vulkan_backend_pump_messages(void);
 
-/* Read the frame back to host memory (and to PS3RECOMP_VK_DUMP if set). */
+/* Read the frame back to host memory (and to PS3RECOMP_VK_DUMP if set), and
+ * show it in the window if there is one. Same as _present_begin() followed
+ * by _present_finish(). */
 void rsx_vulkan_backend_present(void);
+
+/* The same present in two halves, for a host that presents on a thread of its
+ * own beside the FIFO walker.
+ *
+ * _present_begin() reads the flipped surface: it must not run while the
+ * walker is draining (call it under the same lock as
+ * cellGcm_rsx_process_fifo). On the draw engine path it only records and
+ * submits the copy out of that surface, and returns at once.
+ *
+ * _present_finish() waits for that copy, reads the frame back, writes the
+ * dump and presents to the window. It may run while the walker drains the
+ * next frame: the next frame's commands are ordered after the copy, so they
+ * never reach the presented image. On the fixed-function path, where the
+ * walker draws into the presented image itself, _present_begin() does all of
+ * it and _present_finish() has nothing left to do. */
+void rsx_vulkan_backend_present_begin(void);
+void rsx_vulkan_backend_present_finish(void);
+
+/* Centre pixel of the last frame a present copied out, as 0xFFRRGGBB, or 0
+ * before the first. Unlike _readback_center(), which on the draw engine path
+ * reads the surface as it is now, this is what was shown. */
+u32  rsx_vulkan_backend_presented_center(void);
 
 /* The clear colour most recently set through the command stream, ARGB8888. */
 u32  rsx_vulkan_backend_debug_color(void);

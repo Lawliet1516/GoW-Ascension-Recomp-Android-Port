@@ -22,6 +22,10 @@
  *   ATTRn         ->  [[attribute(n)]]   (vertex inputs, in declaration order)
  *   COLOR0/COLOR1/FOG/TEXCOORD0..7 -> [[user(locn0..10)]], numbered in the
  *   declaration order both decompilers share, so the stages link.
+ * The vertex stage is translated with RSX_POINT_SIZE_BUILTIN defined: the
+ * decompiled VSOutput then carries a PointSize built-in (MSL [[point_size]])
+ * and VPConst one more float4 after vp_posoffset, vp_pointsize
+ * (rsx_vp_decompiler.h). A backend binding such MSL supplies that row.
  * The MSL entry point is always `main0`.
  */
 #ifndef PS3RECOMP_RSX_SHADER_MSL_H
@@ -50,6 +54,21 @@ int rsx_hlsl_to_msl_available(void);
 int rsx_hlsl_to_msl(const char* hlsl, int stage,
                     char* out, u32 out_size,
                     char* log, u32 log_size);
+
+/* The translation cache (rsx_shader_msl.cpp). A request is answered from
+ * memory, else from PS3RECOMP_MSL_CACHE's directory, else by glslang and
+ * spirv-cross. Deleting the directory is always safe. */
+typedef struct RsxMslCacheStats {
+    u32 memory_hits;
+    u32 disk_hits;
+    u32 translations;   /* glslang + spirv-cross runs that succeeded */
+} RsxMslCacheStats;
+
+void rsx_hlsl_to_msl_cache_stats(RsxMslCacheStats* out);
+
+/* Empties the memory cache, zeroes the counters and reads
+ * PS3RECOMP_MSL_CACHE again on the next request. Disk files stay. */
+void rsx_hlsl_to_msl_cache_reset(void);
 
 #ifdef __cplusplus
 }
