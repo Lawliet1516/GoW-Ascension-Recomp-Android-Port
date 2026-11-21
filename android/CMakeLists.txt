@@ -21,12 +21,8 @@ option(GOWA_SPU_FASTFP "SPU float ops through the FPCR RZ|FZ fast path (spu_help
 set(GOWA_LIFTED_DIR "" CACHE PATH "Directory with the lifter output (ppu_recomp.h, ...). Empty = runtime library only")
 
 # --- sources (mirrors ps3kit/CMakeLists.txt) ------------------------------
-set(_dirs system filesystem input audio video network spurs sync codec font misc hardware)
-set(HLE_SOURCES)
-foreach(d ${_dirs})
-    file(GLOB _s "${PS3KIT}/libs/${d}/*.c")
-    list(APPEND HLE_SOURCES ${_s})
-endforeach()
+# the Windows port globs libs/ recursively (libs/network/psnr/psnr.c lives in a subdirectory)
+file(GLOB_RECURSE HLE_SOURCES "${PS3KIT}/libs/*.c")
 list(APPEND HLE_SOURCES "${PS3KIT}/libs/codec/edge_inflate.cpp" "${PS3KIT}/libs/video/rsx_shader_spirv.cpp"
                         "${PS3KIT}/libs/video/rsx_shader_msl.cpp")
 file(GLOB _diag "${PS3KIT}/runtime/diag/*.c")
@@ -42,6 +38,11 @@ file(GLOB_RECURSE RUNTIME_SOURCES "${PS3KIT}/runtime/*.c" "${PS3KIT}/runtime/*.c
 list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/tests/|/runtime/ppu/|/runtime/host/|/runtime/diag/|spu_dispatch_mt\\.c$")
 
 add_library(ps3kit_android STATIC ${HLE_SOURCES} ${RUNTIME_SOURCES})
+# Bring-up stand-ins for the symbols the Windows port provides itself (see the file for the list). Not part of the library.
+add_library(gowa_port_stubs STATIC "${CMAKE_CURRENT_SOURCE_DIR}/host/port_stubs.c")
+# The game-agnostic host pieces upstream keeps out of the library (inert reservation/loader hooks) for hosts without a game
+add_library(gowa_host_stubs STATIC "${PS3KIT}/runtime/host/host_stubs.c")
+target_include_directories(gowa_host_stubs PRIVATE ${PS3KIT}/include ${PS3KIT}/runtime ${PS3KIT}/runtime/platform ${PS3KIT}/runtime/ppu)
 target_include_directories(ps3kit_android PUBLIC ${PS3KIT}/include)
 file(GLOB _inc LIST_DIRECTORIES true "${PS3KIT}/libs/*" "${PS3KIT}/runtime/*")
 foreach(d ${_inc})

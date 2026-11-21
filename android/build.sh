@@ -10,5 +10,5 @@ BUILD="${1:-$HERE/../build-android}"
   -DCMAKE_MAKE_PROGRAM="$(dirname "$CMAKE")/ninja" \
   -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 -DCMAKE_BUILD_TYPE=Release \
-  -DSDL3_ROOT="$SDL3_ROOT"
+  -DSDL3_ROOT="$SDL3_ROOT" ${CMAKE_EXTRA:-}
 "$CMAKE" --build "$BUILD" -j"$(nproc)"
