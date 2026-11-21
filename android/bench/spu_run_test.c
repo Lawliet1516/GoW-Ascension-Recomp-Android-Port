@@ -12,6 +12,8 @@
 #include <string.h>
 #include <signal.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 /* The runtime surface comes from libps3kit_android.a; the few symbols the Windows port supplies from ascension/host
  * are in android/host/port_stubs.c (bring-up stand-ins, listed there). */
@@ -82,11 +84,21 @@ int main(void)
     EXPECT(fpcr() == 0x01C00000u, "nested: FPCR 0x%llx", (unsigned long long)fpcr());
     printf("3. caller already in SPU mode -> after run 0x%llx\n", (unsigned long long)fpcr()); set_fpcr(before);
 
-    /* 4. negative control: the lifted code called directly, outside the runtime's mode, must NOT give the SPU's results */
+    /* 4. negative control: the lifted code called directly, outside the runtime's mode, must NOT give the SPU's results
+     *    (a SPU_A64_CHECK_MODE build must refuse to run it: checked in a child process that is expected to abort) */
+#ifdef SPU_A64_CHECK_MODE
+    { pid_t pid = fork();
+      if (pid == 0) { prep(c); c->host_depth = 1; spu_func_00000000(c); _exit(0); }
+      int st = 0; waitpid(pid, &st, 0);
+      const int aborted = WIFSIGNALED(st) && WTERMSIG(st) == SIGABRT;
+      printf("4. checked build, fast op outside the SPU float mode: %s\n", aborted ? "aborted with the diagnostic, as it must" : "NOT detected");
+      EXPECT(aborted, "SPU_A64_CHECK_MODE did not catch a fast op outside the mode"); }
+#else
     prep(c); c->host_depth = 1; spu_func_00000000(c);
     const int direct_ok = check_results(c, "direct (expected to differ)");
     printf("4. negative control (no SPU float mode): results %s\n", direct_ok ? "UNEXPECTEDLY correct (the test cannot tell the modes apart!)" : "differ, as they must");
     EXPECT(!direct_ok, "negative control passed: mode is not what makes the results right");
+#endif
     EXPECT(fpcr() == before, "FPCR changed by the direct call");
 
     /* 5. signal handler runs while an SPU thread is in the mode: informational (inherits), main thread unaffected */

@@ -1,0 +1,7 @@
+default FPCR = 0x0 (RMode=0 FZ=0 DN=0 AH=0 trap-enable bits=0x0)
+trap-enable bits after write: 0x0 (0 => RAZ/WI on this CPU)
+SPU mode FPCR = 0x1c00000
+after longjmp (setjmp taken in SPU mode, mode cleared before): FPCR = 0x0 -> NOT restored (must be re-set by hand)
+inside a signal handler: FPCR = 0x1c00000 -> inherits the mode; after return: 0x1c00000
+a thread created while in SPU mode starts with FPCR = 0x1c00000 -> inherits the mode (must reset)
+FPSR = 0x0 (cumulative flags only; nothing reads them)

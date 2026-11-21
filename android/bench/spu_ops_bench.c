@@ -51,7 +51,7 @@ DEF(mpy, spu_mpy(X, B)) DEF(mpyu, spu_mpyu(X, B)) DEF(mpyh, spu_mpyh(X, B)) DEF(
 DEF(clz, spu_clz(X)) DEF(cntb, spu_cntb(X)) DEF(gb, spu_gb(X)) DEF(avgb, spu_avgb(X, B)) DEF(absdb, spu_absdb(X, B)) DEF(orx, spu_orx(X))
 /* float: the ops the game's geometry and audio jobs run */
 DEF(fa, spu_fa(X, BF)) DEF(fs, spu_fs(X, BF)) DEF(fm, spu_fm(X, BF)) DEF(fma, spu_fma(X, BF, C)) DEF(fms, spu_fms(X, BF, C))
-DEF(fnms, spu_fnms(X, BF, C)) DEF(frest, spu_frest(X)) DEF(frsqest, spu_frsqest(X)) DEF(fi, spu_fi(X, BF))
+DEF(fnms, spu_fnms(X, BF, C)) DEF(frest, spu_frest(X)) DEF(frsqest, spu_frsqest(X)) DEF(fi, spu_fi(X, B))
 DEF(csflt, spu_csflt(X, 3)) DEF(cflts, spu_cflts(X, 3)) DEF(fceq, spu_fceq(X, BF)) DEF(fcgt, spu_fcgt(X, BF)) DEF(fcmgt, spu_fcmgt(X, BF))
 
 #ifdef SPU_A64_COUNT

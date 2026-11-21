@@ -1,0 +1,45 @@
+## scalar run1
+skin           179.11           5.58   (best of 2632 passes)
+recip          187.35           5.34   (best of 2570 passes)
+bits            22.81          43.84   (best of 21070 passes)
+copy             1.72         582.56   (best of 232917 passes)
+## neon run1
+skin           239.40           4.18   (best of 1991 passes)
+recip          189.21           5.29   (best of 2542 passes)
+bits             9.74         102.67   (best of 49273 passes)
+copy             1.96         510.72   (best of 242475 passes)
+## fastfp run1
+skin           104.20           9.60   (best of 4576 passes)
+recip           49.29          20.29   (best of 8678 passes)
+bits             8.34         119.89   (best of 50489 passes)
+copy             1.67         600.32   (best of 251545 passes)
+## scalar run2
+skin           154.85           6.46   (best of 2678 passes)
+recip          188.55           5.30   (best of 2544 passes)
+bits            19.54          51.17   (best of 20533 passes)
+copy             1.72         582.56   (best of 240409 passes)
+## neon run2
+skin           239.68           4.17   (best of 1983 passes)
+recip          189.53           5.28   (best of 2523 passes)
+bits             9.74         102.67   (best of 49231 passes)
+copy             1.96         510.72   (best of 241753 passes)
+## fastfp run2
+skin            89.09          11.23   (best of 4620 passes)
+recip           49.34          20.27   (best of 7977 passes)
+bits             8.34         119.89   (best of 53506 passes)
+copy             1.96         510.72   (best of 241865 passes)
+## scalar run3
+skin           180.44           5.54   (best of 2627 passes)
+recip          188.47           5.31   (best of 2542 passes)
+bits            22.81          43.84   (best of 20952 passes)
+copy             2.01         497.75   (best of 234485 passes)
+## neon run3
+skin           239.50           4.18   (best of 1994 passes)
+recip          189.31           5.28   (best of 2521 passes)
+bits             8.34         119.89   (best of 51766 passes)
+copy             1.67         600.32   (best of 235229 passes)
+## fastfp run3
+skin           104.20           9.60   (best of 4191 passes)
+recip           57.69          17.33   (best of 8012 passes)
+bits             9.74         102.67   (best of 47202 passes)
+copy             1.67         600.32   (best of 265600 passes)

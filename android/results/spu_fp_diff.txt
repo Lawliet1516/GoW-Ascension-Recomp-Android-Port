@@ -1,0 +1,3 @@
+fast path vs exact reference: 4332637 records x 6 ops (4 mixed lanes per vector): ALL EQUAL (0 differences)
+part 1 (fa fs fm fma fms fnms vs exact reference, SPU float mode): ok (0 mismatches over 4000000 vectors per op)
+part 2 (other float helpers identical in standard and SPU float mode): ok (0 mismatches)

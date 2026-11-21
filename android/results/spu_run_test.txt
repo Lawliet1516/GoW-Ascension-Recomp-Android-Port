@@ -1,0 +1,21 @@
+FPCR at start: 0x0
+1. SPU results correct, FPCR restored after halt: yes (stop code 0x0)
+2. caller FPCR 0x400000 -> after run 0x400000
+3. caller already in SPU mode -> after run 0x1c00000
+  direct (expected to differ): result 4 = 3f800001, want 3f800000
+  direct (expected to differ): result 5 = 00800000, want 00000000
+4. negative control (no SPU float mode): results differ, as they must
+5. signal handler FPCR (outside SPU mode) = 0x0
+6. thread created from SPU mode starts with FPCR 0x0
+7. 4 threads x 20000 runs: all results correct, no drift
+PASSED (0 failures)
+[spu-fp] FATAL: spu_fa outside the SPU float mode
+FPCR at start: 0x0
+1. SPU results correct, FPCR restored after halt: yes (stop code 0x0)
+2. caller FPCR 0x400000 -> after run 0x400000
+3. caller already in SPU mode -> after run 0x1c00000
+4. checked build, fast op outside the SPU float mode: aborted with the diagnostic, as it must
+5. signal handler FPCR (outside SPU mode) = 0x0
+6. thread created from SPU mode starts with FPCR 0x0
+7. 4 threads x 20000 runs: all results correct, no drift
+PASSED (0 failures)

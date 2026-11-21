@@ -1,0 +1,18 @@
+device: Adreno (TM) 710  type=1  api=1.1.128  driver=0x80267063 vendor=0x5143
+features: textureCompressionBC=1 ETC2=1 ASTC_LDR=1 samplerAnisotropy=1 shaderInt16=1 shaderFloat64=0 geometryShader=1 tessellation=1 independentBlend=1 depthClamp=1 fillModeNonSolid=1 multiDrawIndirect=1 occlusionQueryPrecise=1 fragmentStoresAndAtomics=1 dualSrcBlend=1 wideLines=1
+limits: maxImageDimension2D=16384 maxUniformBufferRange=65536 maxStorageBufferRange=134217728 maxPushConstants=256 maxBoundDescriptorSets=7 maxPerStageSamplers=524288 maxColorAttachments=8 maxFragmentInputComponents=112 maxVertexInputAttributes=32 maxSamplerAnisotropy=16 nonCoherentAtomSize=1 minUniformBufferOffsetAlignment=64 timestampPeriod=52.1
+heap 0: 11280 MB flags=0x1
+heap 1: 256 MB flags=0x1
+  type 0 heap 0 props=0x1 DEVICE_LOCAL
+  type 1 heap 0 props=0x1 DEVICE_LOCAL
+  type 2 heap 0 props=0x1 DEVICE_LOCAL
+  type 3 heap 0 props=0xb DEVICE_LOCAL HOST_VISIBLE HOST_CACHED
+  type 4 heap 0 props=0x7 DEVICE_LOCAL HOST_VISIBLE HOST_COHERENT
+  type 5 heap 0 props=0x7 DEVICE_LOCAL HOST_VISIBLE HOST_COHERENT
+  type 6 heap 0 props=0xf DEVICE_LOCAL HOST_VISIBLE HOST_COHERENT HOST_CACHED
+  type 7 heap 1 props=0x21 DEVICE_LOCAL
+  type 8 heap 0 props=0x11 DEVICE_LOCAL
+queue family 0: count=3 flags=0x1b GRAPHICS COMPUTE
+queue family 1: count=1 flags=0x8
+sampled-image support: BC1=yes BC3=yes BC7=yes D24S8=yes D32S8=yes BGRA8=yes RGBA16F=yes ETC2=yes ASTC4x4=yes
+89 device extensions; of interest: KHR_swapchain+ KHR_timeline_semaphore+ KHR_dynamic_rendering- KHR_synchronization2+ EXT_extended_dynamic_state+ KHR_push_descriptor+ EXT_descriptor_indexing+ KHR_16bit_storage+ KHR_shader_float16_int8+ QCOM_render_pass_transform+ EXT_depth_clip_enable- KHR_draw_indirect_count+ EXT_shader_demote_to_helper_invocation+ EXT_conservative_rasterization- KHR_driver_properties+ EXT_pipeline_creation_cache_control+ KHR_pipeline_executable_properties+ KHR_depth_stencil_resolve+ KHR_create_renderpass2+ EXT_queue_family_foreign+ ANDROID_external_memory_android_hardware_buffer+ EXT_fragment_density_map+

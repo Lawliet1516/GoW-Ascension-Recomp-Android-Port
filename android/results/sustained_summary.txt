@@ -1,0 +1,5 @@
+sus_scalar.txt   n=48 thr mean= 25.34 sd= 1.73 min= 19.10 max= 28.72 | q1= 26.04 q4= 25.74 ( -1.1%) | temp mean=55.7 max=70.9 | big MHz mean= 1396 min= 1344 max= 2400 | thr/GHz= 18.3
+sus_neon.txt     n=48 thr mean= 29.99 sd= 4.41 min= 14.65 max= 35.90 | q1= 34.56 q4= 24.12 (-30.2%) | temp mean=61.9 max=74.0 | big MHz mean= 1869 min= 1344 max= 2400 | thr/GHz= 16.3
+sus_neon2.txt    n=48 thr mean= 22.97 sd= 4.75 min= 14.73 max= 33.61 | q1= 25.62 q4= 24.84 ( -3.0%) | temp mean=52.2 max=72.6 | big MHz mean= 1530 min=  691 max= 2304 | thr/GHz= 16.2
+sus_fastfp.txt   n=48 thr mean= 60.48 sd= 3.01 min= 52.38 max= 65.68 | q1= 60.35 q4= 59.36 ( -1.6%) | temp mean=54.0 max=57.6 | big MHz mean= 1477 min= 1344 max= 1900 | thr/GHz= 41.1
+sus_fastfp2.txt  n=48 thr mean= 84.85 sd=10.75 min= 46.36 max= 92.49 | q1= 74.70 q4= 87.37 (+17.0%) | temp mean=55.5 max=63.1 | big MHz mean= 2041 min=  691 max= 2400 | thr/GHz= 42.0
