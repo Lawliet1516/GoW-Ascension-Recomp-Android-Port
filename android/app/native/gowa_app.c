@@ -181,6 +181,9 @@ static int create_swapchain(void)
     for (uint32_t i = 0; i < nf; i++) if (sf[i].format == VK_FORMAT_R8G8B8A8_UNORM || sf[i].format == VK_FORMAT_B8G8R8A8_UNORM) { pick = sf[i]; break; }
     if (!create_pass_and_pipeline(pick.format)) return 0;
 
+    { VkPresentModeKHR pm[8]; uint32_t np = 8; vkGetPhysicalDeviceSurfacePresentModesKHR(g.phys, g.surf, &np, pm);
+      char b[96] = ""; for (uint32_t i = 0; i < np && i < 8; i++) { char t[16]; snprintf(t, sizeof t, "%d ", (int)pm[i]); strcat(b, t); }
+      LOG("present modes (0=IMMEDIATE 1=MAILBOX 2=FIFO 3=FIFO_RELAXED): %s", b); }
     /* FIFO is the one mode every driver has. Image count: one more than the minimum so acquire does not stall on the compositor. */
     uint32_t want = caps.minImageCount + 1; if (want < 3) want = 3; if (caps.maxImageCount && want > caps.maxImageCount) want = caps.maxImageCount; if (want > MAX_IMG) want = MAX_IMG;
     /* Transform: identity when the surface accepts it (the compositor rotates if the display is rotated: simple, costs a pass on some devices;
