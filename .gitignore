@@ -4,3 +4,6 @@
 build/
 __pycache__/
 *.pyc
+build-android/
+android/bench/out/
+android/**/out/

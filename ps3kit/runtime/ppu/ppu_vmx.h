@@ -323,6 +323,36 @@ VMX_INL void vmx_vnmsubfp(VMX_D, VMX_A, VMX_B, VMX_C, uint32_t vscr)
     vmx__store4(d_, _mm_xor_ps(_mm_fmsub_ps(vmx__load4(a_, vscr), vmx__load4(c_, vscr), vmx__load4(b_, vscr)),
                                _mm_castsi128_ps(_mm_set1_epi32((int)0x80000000u))), vscr);
 }
+#elif defined(__ARM_NEON) && !defined(PPU_VMX_SCALAR)
+/* AArch64 (Android): the same four-lane forms on NEON. vfmaq_f32 is one fused
+ * multiply-add like _mm_fmadd_ps, so the bits match the scalar loop above. AArch64's
+ * default NaN is +QNaN 0x7FC00000 (x86's is negative); vmx__fix4 makes it explicit anyway. */
+#include <arm_neon.h>
+VMX_INL uint32x4_t vmx__bswap4(uint32x4_t v) { return vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(v))); }
+VMX_INL uint32x4_t vmx__flush4(uint32x4_t x, uint32_t vscr)
+{
+    if (!(vscr & VMX_NJ)) return x;
+    const uint32x4_t den = vceqq_u32(vandq_u32(x, vdupq_n_u32(0x7F800000u)), vdupq_n_u32(0));
+    return vbslq_u32(den, vandq_u32(x, vdupq_n_u32(0x80000000u)), x);
+}
+VMX_INL uint32x4_t vmx__fix4(uint32x4_t r)
+{
+    const uint32x4_t nan = vcgtq_u32(vandq_u32(r, vdupq_n_u32(0x7FFFFFFFu)), vdupq_n_u32(0x7F800000u));
+    return vbslq_u32(nan, vdupq_n_u32(0x7FC00000u), r);
+}
+VMX_INL uint32x4_t vmx__ld4(const void* p) { return vmx__bswap4(vreinterpretq_u32_u8(vld1q_u8((const uint8_t*)p))); }
+VMX_INL void vmx__st4(void* p, uint32x4_t v) { vst1q_u8((uint8_t*)p, vreinterpretq_u8_u32(vmx__bswap4(v))); }
+VMX_INL float32x4_t vmx__load4(const void* p, uint32_t vscr) { return vreinterpretq_f32_u32(vmx__flush4(vmx__ld4(p), vscr)); }
+VMX_INL void vmx__store4(void* p, float32x4_t r, uint32_t vscr) { vmx__st4(p, vmx__flush4(vmx__fix4(vreinterpretq_u32_f32(r)), vscr)); }
+VMX_INL void vmx_vmaddfp(VMX_D, VMX_A, VMX_B, VMX_C, uint32_t vscr)
+{   /* a * c + b */
+    vmx__store4(d_, vfmaq_f32(vmx__load4(b_, vscr), vmx__load4(a_, vscr), vmx__load4(c_, vscr)), vscr);
+}
+VMX_INL void vmx_vnmsubfp(VMX_D, VMX_A, VMX_B, VMX_C, uint32_t vscr)
+{   /* -(a * c - b), as -fmaf(x, z, -y) */
+    const float32x4_t t = vfmaq_f32(vnegq_f32(vmx__load4(b_, vscr)), vmx__load4(a_, vscr), vmx__load4(c_, vscr));
+    vmx__store4(d_, vnegq_f32(t), vscr);
+}
 #else
 VMX_INL void vmx_vmaddfp(VMX_D, VMX_A, VMX_B, VMX_C, uint32_t vscr) { vmx_vmaddfp_ref(d_, a_, b_, c_, vscr); }
 VMX_INL void vmx_vnmsubfp(VMX_D, VMX_A, VMX_B, VMX_C, uint32_t vscr) { vmx_vnmsubfp_ref(d_, a_, b_, c_, vscr); }
@@ -447,6 +477,47 @@ VMX_INL uint32_t vmx_vcmpequw(VMX_D, VMX_A, VMX_B)
     return vmx__cr6_4(d_, _mm_castsi128_ps(_mm_cmpeq_epi32(_mm_loadu_si128((const __m128i*)a_),
                                                           _mm_loadu_si128((const __m128i*)b_))));
 }
+#elif defined(__ARM_NEON) && !defined(PPU_VMX_SCALAR)
+VMX_INL uint32x4_t vmx__isnan4(uint32x4_t v)
+{ return vcgtq_u32(vandq_u32(v, vdupq_n_u32(0x7FFFFFFFu)), vdupq_n_u32(0x7F800000u)); }
+VMX_INL uint32x4_t vmx__vnan1_4(uint32x4_t r, uint32x4_t b)
+{ return vbslq_u32(vmx__isnan4(b), vorrq_u32(b, vdupq_n_u32(0x7FC00000u)), vmx__fix4(r)); }
+VMX_INL uint32x4_t vmx__vnan2_4(uint32x4_t r, uint32x4_t a, uint32x4_t b)
+{ return vbslq_u32(vmx__isnan4(a), vorrq_u32(a, vdupq_n_u32(0x7FC00000u)), vmx__vnan1_4(r, b)); }
+#define VMX_FBIN4(name, op) \
+VMX_INL void name(VMX_D, VMX_A, VMX_B, uint32_t vscr) { \
+    const uint32x4_t x = vmx__flush4(vmx__ld4(a_), vscr), y = vmx__flush4(vmx__ld4(b_), vscr); \
+    const uint32x4_t z = vreinterpretq_u32_f32(op(vreinterpretq_f32_u32(x), vreinterpretq_f32_u32(y))); \
+    vmx__st4(d_, vmx__flush4(vmx__vnan2_4(z, x, y), vscr)); }
+VMX_FBIN4(vmx_vaddfp, vaddq_f32)
+VMX_FBIN4(vmx_vsubfp, vsubq_f32)
+VMX_INL float32x4_t vmx__rcp4(float32x4_t f) { return vdivq_f32(vdupq_n_f32(1.0f), f); }
+VMX_INL float32x4_t vmx__rsqrt4(float32x4_t f) { return vdivq_f32(vdupq_n_f32(1.0f), vsqrtq_f32(f)); }
+#define VMX_FUN4(name, op) \
+VMX_INL void name(VMX_D, VMX_B, uint32_t vscr) { \
+    const uint32x4_t y = vmx__flush4(vmx__ld4(b_), vscr); \
+    vmx__st4(d_, vmx__flush4(vmx__vnan1_4(vreinterpretq_u32_f32(op(vreinterpretq_f32_u32(y))), y), vscr)); }
+VMX_FUN4(vmx_vrefp, vmx__rcp4)
+VMX_FUN4(vmx_vrsqrtefp, vmx__rsqrt4)
+VMX_INL void vmx_vcfsx(VMX_D, VMX_B, unsigned uimm)
+{
+    const float32x4_t sc = vreinterpretq_f32_u32(vdupq_n_u32((127u - uimm) << 23));
+    vmx__st4(d_, vreinterpretq_u32_f32(vmulq_f32(vcvtq_f32_s32(vreinterpretq_s32_u32(vmx__ld4(b_))), sc)));
+}
+/* A lane is all ones or all zeros, so the mask is stored without a swap. */
+VMX_INL uint32_t vmx__cr6_4(void* d_, uint32x4_t m)
+{
+    vst1q_u32((uint32_t*)d_, m);
+    return (uint32_t)((vminvq_u32(m) == 0xFFFFFFFFu) << 3 | (vmaxvq_u32(m) == 0) << 1);
+}
+#define VMX_FCMP4(name, cmp) \
+VMX_INL uint32_t name(VMX_D, VMX_A, VMX_B) \
+{ return vmx__cr6_4(d_, cmp(vreinterpretq_f32_u32(vmx__ld4(a_)), vreinterpretq_f32_u32(vmx__ld4(b_)))); }
+VMX_FCMP4(vmx_vcmpeqfp, vceqq_f32)
+VMX_FCMP4(vmx_vcmpgefp, vcgeq_f32)
+VMX_FCMP4(vmx_vcmpgtfp, vcgtq_f32)
+VMX_INL uint32_t vmx_vcmpequw(VMX_D, VMX_A, VMX_B)
+{ return vmx__cr6_4(d_, vceqq_u32(vreinterpretq_u32_u8(vld1q_u8((const uint8_t*)a_)), vreinterpretq_u32_u8(vld1q_u8((const uint8_t*)b_)))); }
 #else
 VMX_INL void vmx_vaddfp(VMX_D, VMX_A, VMX_B, uint32_t vscr) { vmx_vaddfp_ref(d_, a_, b_, vscr); }
 VMX_INL void vmx_vsubfp(VMX_D, VMX_A, VMX_B, uint32_t vscr) { vmx_vsubfp_ref(d_, a_, b_, vscr); }
