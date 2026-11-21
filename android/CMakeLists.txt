@@ -13,8 +13,10 @@ endif()
 
 set(PS3KIT "${CMAKE_CURRENT_SOURCE_DIR}/../ps3kit" CACHE PATH "ps3kit source tree")
 set(SDL3_ROOT "" CACHE PATH "SDL3 prefix with include/ and lib/libSDL3.so")
-set(GOWA_ARCH_FLAGS "-march=armv8.2-a+fp16+dotprod" CACHE STRING
-    "CPU target. Snapdragon 7s Gen 2 = Cortex-A710 (big) + A510 (little): ARMv9.0, so v8.2+dotprod is safe")
+# Snapdragon 7s Gen 2 (Redmi Note 13 Pro 5G), read from /proc/cpuinfo on the device: 4x Cortex-A78 (cpu4-7,
+# 2.4 GHz) + 4x Cortex-A55 (cpu0-3, 1.96 GHz); ARMv8.2-A with fp16 and dotprod, NO sve/sve2/bf16/i8mm.
+# (-mcpu=cortex-a710 compiles but dies with SIGILL there.)
+set(GOWA_ARCH_FLAGS "-mcpu=cortex-a78" CACHE STRING "CPU target for the big cores")
 set(GOWA_LIFTED_DIR "" CACHE PATH "Directory with the lifter output (ppu_recomp.h, ...). Empty = runtime library only")
 
 # --- sources (mirrors ps3kit/CMakeLists.txt) ------------------------------
