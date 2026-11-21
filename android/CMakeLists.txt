@@ -32,6 +32,19 @@ list(APPEND HLE_SOURCES ${AT3_SOURCES})
 # Windows/Apple-only RSX backends
 list(FILTER HLE_SOURCES EXCLUDE REGEX "/tests/|rsx_d3d12_backend\\.c$|rsx_metal_backend")
 
+# --- renderer migration (branch android/renderer-upstream): the video layer from render/libs/video (pinned upstream v0.20.0 + the Ascension
+# changes reapplied so far, see android/render/MERGE_LOG.md) instead of ps3kit/libs/video. ps3kit/libs/video is not touched either way.
+option(GOWA_RENDER_UPSTREAM "build the video layer from render/libs/video" OFF)
+set(GLSLANG_PREFIX "" CACHE PATH "arm64 glslang install prefix (HLSL front end), needed by render/libs/video/rsx_shader_spirv.cpp")
+set(SDL2_PREFIX "" CACHE PATH "arm64 SDL2 (static) prefix, for the pure-upstream video layer which calls SDL2 directly (scene tests)")
+if(GOWA_RENDER_UPSTREAM)
+    list(FILTER HLE_SOURCES EXCLUDE REGEX "/ps3kit/libs/video/|/libs/video/rsx_shader_spirv")
+    file(GLOB RENDER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video/*.cpp")
+    # not built yet: Apple's MSL translator; fork-only Ascension files whose APIs live in decompiler/dispatch changes not reapplied yet
+    list(FILTER RENDER_SOURCES EXCLUDE REGEX "rsx_shader_msl|rsx_fp_uber|rsx_texpack|tex_stream_diag")
+    list(APPEND HLE_SOURCES ${RENDER_SOURCES})
+endif()
+
 file(GLOB_RECURSE RUNTIME_SOURCES "${PS3KIT}/runtime/*.c" "${PS3KIT}/runtime/*.cpp")
 # spu_dispatch_mt.c needs musttail and is compiled inside the game target (like on Windows)
 list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/tests/|/runtime/ppu/|/runtime/host/|/runtime/diag/|spu_dispatch_mt\\.c$")
@@ -46,6 +59,10 @@ endif()
 # The game-agnostic host pieces upstream keeps out of the library (inert reservation/loader hooks) for hosts without a game
 add_library(gowa_host_stubs STATIC "${PS3KIT}/runtime/host/host_stubs.c")
 target_include_directories(gowa_host_stubs PRIVATE ${PS3KIT}/include ${PS3KIT}/runtime ${PS3KIT}/runtime/platform ${PS3KIT}/runtime/ppu)
+if(GOWA_RENDER_UPSTREAM)
+    target_include_directories(ps3kit_android PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../render/include")   # before ps3kit/include on purpose
+    target_include_directories(ps3kit_android PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video" ${GLSLANG_PREFIX}/include)
+endif()
 target_include_directories(ps3kit_android PUBLIC ${PS3KIT}/include)
 file(GLOB _inc LIST_DIRECTORIES true "${PS3KIT}/libs/*" "${PS3KIT}/runtime/*")
 foreach(d ${_inc})
@@ -55,7 +72,13 @@ foreach(d ${_inc})
 endforeach()
 target_include_directories(ps3kit_android PRIVATE ${PS3KIT}/runtime ${PS3KIT}/libs)
 
-target_compile_definitions(ps3kit_android PUBLIC PS3_SDL3=1 _GNU_SOURCE)
+if(GOWA_RENDER_UPSTREAM AND SDL2_PREFIX)
+    # the pure-upstream video layer calls SDL2 directly; one SDL version per binary (SDL2 and SDL3 export the same names)
+    target_compile_definitions(ps3kit_android PUBLIC _GNU_SOURCE)
+    target_include_directories(ps3kit_android PUBLIC ${SDL2_PREFIX}/include)
+else()
+    target_compile_definitions(ps3kit_android PUBLIC PS3_SDL3=1 _GNU_SOURCE)
+endif()
 target_compile_options(ps3kit_android PRIVATE
     -O2 -fno-strict-aliasing -fdeclspec
     # PPC fmadd must stay a fused op only where the lifter says so; arm64 clang
@@ -64,8 +87,10 @@ target_compile_options(ps3kit_android PRIVATE
     ${GOWA_ARCH_FLAGS}
     -w)
 
-# --- SDL3 -----------------------------------------------------------------
-if(SDL3_ROOT)
+# --- SDL ---------------------------------------------------------------------
+if(GOWA_RENDER_UPSTREAM AND SDL2_PREFIX)
+    target_link_libraries(ps3kit_android PUBLIC ${SDL2_PREFIX}/lib/libSDL2.a)
+elseif(SDL3_ROOT)
     add_library(SDL3::SDL3 SHARED IMPORTED)
     set_target_properties(SDL3::SDL3 PROPERTIES
         IMPORTED_LOCATION "${SDL3_ROOT}/lib/libSDL3.so"
@@ -74,8 +99,20 @@ if(SDL3_ROOT)
 else()
     message(FATAL_ERROR "Pass -DSDL3_ROOT=<prefix> (include/SDL3, lib/libSDL3.so)")
 endif()
+if(GOWA_RENDER_UPSTREAM AND GLSLANG_PREFIX)
+    target_link_libraries(ps3kit_android PUBLIC ${GLSLANG_PREFIX}/lib/libglslang.a ${GLSLANG_PREFIX}/lib/libMachineIndependent.a ${GLSLANG_PREFIX}/lib/libGenericCodeGen.a
+        ${GLSLANG_PREFIX}/lib/libSPIRV.a ${GLSLANG_PREFIX}/lib/libglslang-default-resource-limits.a ${GLSLANG_PREFIX}/lib/libOSDependent.a)
+endif()
 # Vulkan headers come from the NDK sysroot; the backend dlopens libvulkan.so at run time.
 target_link_libraries(ps3kit_android PUBLIC log android dl m)
+
+# --- the upstream scene runner (render/host: upstream's host_posix.c + host_stubs.c, unmodified) -------------------------------------------
+if(GOWA_RENDER_UPSTREAM)
+    add_executable(gowa_render_host "${CMAKE_CURRENT_SOURCE_DIR}/../render/host/host_posix.c" "${CMAKE_CURRENT_SOURCE_DIR}/../render/host/host_stubs.c")
+    target_include_directories(gowa_render_host PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video" "${CMAKE_CURRENT_SOURCE_DIR}/../render/include" ${PS3KIT}/include ${PS3KIT}/runtime)
+    target_link_libraries(gowa_render_host PRIVATE ps3kit_android)
+    set_target_properties(gowa_render_host PROPERTIES LINKER_LANGUAGE CXX)
+endif()
 
 # --- benchmarks (no game needed) --------------------------------------------
 add_subdirectory(bench)
