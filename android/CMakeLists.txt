@@ -43,6 +43,8 @@ if(GOWA_RENDER_UPSTREAM)
     # not built yet: Apple's MSL translator; fork-only Ascension files whose APIs live in decompiler/dispatch changes not reapplied yet
     list(FILTER RENDER_SOURCES EXCLUDE REGEX "rsx_shader_msl|rsx_fp_uber|rsx_texpack|tex_stream_diag")
     list(APPEND HLE_SOURCES ${RENDER_SOURCES})
+    # what upstream's CMake sets when PS3RECOMP_RSX_VULKAN is on and glslang is found
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video/rsx_shader_spirv.cpp" PROPERTIES COMPILE_DEFINITIONS PS3RECOMP_HAVE_SPIRV_TRANSLATION=1)
 endif()
 
 file(GLOB_RECURSE RUNTIME_SOURCES "${PS3KIT}/runtime/*.c" "${PS3KIT}/runtime/*.cpp")
@@ -72,6 +74,9 @@ foreach(d ${_inc})
 endforeach()
 target_include_directories(ps3kit_android PRIVATE ${PS3KIT}/runtime ${PS3KIT}/libs)
 
+if(GOWA_RENDER_UPSTREAM)
+    target_compile_definitions(ps3kit_android PUBLIC PS3RECOMP_RSX_VULKAN)    # the hosts select the Vulkan backend on this
+endif()
 if(GOWA_RENDER_UPSTREAM AND SDL2_PREFIX)
     # the pure-upstream video layer calls SDL2 directly; one SDL version per binary (SDL2 and SDL3 export the same names)
     target_compile_definitions(ps3kit_android PUBLIC _GNU_SOURCE)
@@ -109,8 +114,14 @@ target_link_libraries(ps3kit_android PUBLIC log android dl m)
 # --- the upstream scene runner (render/host: upstream's host_posix.c + host_stubs.c, unmodified) -------------------------------------------
 if(GOWA_RENDER_UPSTREAM)
     add_executable(gowa_render_host "${CMAKE_CURRENT_SOURCE_DIR}/../render/host/host_posix.c" "${CMAKE_CURRENT_SOURCE_DIR}/../render/host/host_stubs.c")
-    target_include_directories(gowa_render_host PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video" "${CMAKE_CURRENT_SOURCE_DIR}/../render/include" ${PS3KIT}/include ${PS3KIT}/runtime)
-    target_link_libraries(gowa_render_host PRIVATE ps3kit_android)
+    target_include_directories(gowa_render_host PRIVATE ${PS3KIT}/runtime/host   # upstream host files include ../memory/vm.h etc.: resolved against the fork runtime
+        "${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video" "${CMAKE_CURRENT_SOURCE_DIR}/../render/include" ${PS3KIT}/include ${PS3KIT}/runtime)
+    add_library(gowa_render_shims STATIC "${CMAKE_CURRENT_SOURCE_DIR}/host/render_runtime_shims.c")   # see the file: runtime functions newer than the fork's runtime
+    set(GOWA_RENDER_BRINGUP_STUBS "")
+    if(TARGET gowa_bringup_stubs)
+        set(GOWA_RENDER_BRINGUP_STUBS gowa_bringup_stubs)    # g_spu_iojrn_rt (data symbol) and friends; needs -DGOWA_BRINGUP_STUBS=ON
+    endif()
+    target_link_libraries(gowa_render_host PRIVATE gowa_render_shims ps3kit_android gowa_render_shims ${GOWA_RENDER_BRINGUP_STUBS} OpenSLES)
     set_target_properties(gowa_render_host PROPERTIES LINKER_LANGUAGE CXX)
 endif()
 

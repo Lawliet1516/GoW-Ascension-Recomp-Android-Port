@@ -45,3 +45,23 @@ A feature is never dropped because upstream's default is off: each ledger entry 
 `android/render/r0_scenes.sh` runs upstream's own scene suite (same list and pass criteria as its `linux-vulkan.yml`). Built from pristine upstream v0.20.0 plus the 32-line
 Android portability patch `android-portability/upstream-v0.20.0-android.patch` (bionic has no `ucontext` and no `pthread_setaffinity_np`).
 Result (21/11/2026, Adreno (TM) 710, Vulkan 1.1.128, no validation layer yet): **29 of 30 runs pass; `--clip` fails** (see `r0_results.md`).
+
+## S3: the migrated tree reproduces the unmodified upstream (21/11/2026)
+
+`render/libs/video` (pure upstream v0.20.0, steps 1-8) built with `android/CMakeLists.txt -DGOWA_RENDER_UPSTREAM=ON` (fork runtime, SDL2 static, glslang for arm64)
+and run through the same 30 scene runs: **identical table to the pristine-upstream baseline** (`results/migrated_tree_table.md` vs `results/r0_table.md`): the same 29 pass and the same `--clip` failure.
+All 18 upstream video-layer files compile against the fork's runtime headers once `render/include` (7 new + 2 updated upstream headers) is searched first.
+
+**Runtime drift found while linking** (the video layer of v0.20.0 calls runtime functions that the fork's v0.15-based `ps3kit/runtime` does not have):
+- `ps3_system_time_us` (upstream `runtime/syscalls/sys_timer.c`): trivial, shimmed in `android/host/render_runtime_shims.c` (a copy of the POSIX branch).
+- `spu_taskset_round_busy` (upstream `runtime/spu/spu_workload.c`): lets the RSX hold its next report while SPURS "round" tasks are busy (`GCM_REPORT_SPU_HOLD_MS`);
+  shimmed to 0 for the scene runner, which has no SPU tasksets. **For the real game this is a runtime migration**, not a shim: it is exactly the kind of RSX/SPURS
+  interplay the Ascension walker depends on. The shim prints a warning if it is ever asked.
+No other runtime symbol was missing. The bring-up stubs file no longer defines `psnr_*` (real code in the library) and `vm_base` is weak.
+
+## Validation layers (state)
+
+The Khronos validation layer **does load inside a debuggable APK** on this phone: `libVkLayer_khronos_validation.so` (Vulkan-ValidationLayers 1.4.363.1 android binaries, arm64) in the
+app's `jniLibs` plus `setprop debug.vulkan.layers VK_LAYER_KHRONOS_validation` (the library is mapped in the app process, checked in `/proc/<pid>/maps`). A native executable cannot use it
+(`vkCreateInstance` returns VK_ERROR_LAYER_NOT_PRESENT), so the scene runner must run inside the APK; that packaging is the next step. **Caution:** the property is global; it must be reset
+afterwards (`setprop debug.vulkan.layers ''`, the empty string, with the quoting shown) or every native Vulkan executable on the phone fails. The scene results above are therefore *without* validation.
