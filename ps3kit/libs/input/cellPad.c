@@ -48,15 +48,7 @@
 #if PAD_BACKEND_SDL2
   /* This file has no main(); keep SDL from renaming one. */
   #define SDL_MAIN_HANDLED
-  #if defined(__has_include)
-    #if __has_include(<SDL2/SDL.h>)
-      #include <SDL2/SDL.h>
-    #else
-      #include <SDL.h>   /* the Windows VC package puts the headers in include/ */
-    #endif
-  #else
-    #include <SDL2/SDL.h>
-  #endif
+  #include "ps3_sdl.h"
   #ifdef _WIN32
     /* The keyboard fallback below uses the Win32 API. */
     #ifndef WIN32_LEAN_AND_MEAN

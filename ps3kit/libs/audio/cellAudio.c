@@ -83,7 +83,7 @@ extern uint32_t sys_event_queue_create_direct(uint64_t key, int32_t size);
 #endif
 
 #if AUDIO_BACKEND_SDL2
-  #include <SDL2/SDL.h>
+  #include "ps3_sdl.h"
 #endif
 
 /* Portable threading */
@@ -349,7 +349,39 @@ static inline int audio_block_state(const float* b, u32 bs, u32 nch)
  * Host audio output backend
  * -----------------------------------------------------------------------*/
 
-#if AUDIO_BACKEND_SDL2
+#if AUDIO_BACKEND_SDL2 && defined(PS3_SDL3)
+
+/* SDL3: the same queue semantics on an SDL_AudioStream (ps3_sdl.h). */
+static ps3sdl_audio s_sdl3_audio;
+
+static int audio_backend_init(void)
+{
+    if (SDL_WasInit(SDL_INIT_AUDIO) == 0) {
+        if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
+            printf("[cellAudio] SDL audio init failed: %s\n", SDL_GetError());
+            return -1;
+        }
+    }
+    if (ps3sdl_audio_open(&s_sdl3_audio, CELL_AUDIO_SAMPLE_RATE, 2) != 0) {
+        printf("[cellAudio] SDL_OpenAudioDeviceStream failed: %s\n", SDL_GetError());
+        return -1;
+    }
+    return 0;
+}
+static void audio_backend_shutdown(void) { ps3sdl_audio_close(&s_sdl3_audio); }
+static void audio_backend_submit(const float* stereo_samples, u32 num_samples)
+{ ps3sdl_audio_queue(&s_sdl3_audio, stereo_samples, num_samples * 2 * sizeof(float)); }
+static int audio_backend_room(void)
+{
+    if (!s_sdl3_audio.s) return -1;
+    return ps3sdl_audio_queued(&s_sdl3_audio) / (2 * sizeof(float)) <
+           CELL_AUDIO_BLOCK_SAMPLES * 4 ? CELL_AUDIO_BLOCK_SAMPLES : 0;
+}
+static void audio_backend_wait(void) { SDL_Delay(1); }
+static u32 audio_backend_queued_samples(void)
+{ return ps3sdl_audio_queued(&s_sdl3_audio) / (2 * sizeof(float)); }
+
+#elif AUDIO_BACKEND_SDL2
 
 static SDL_AudioDeviceID s_sdl_audio_dev = 0;
 

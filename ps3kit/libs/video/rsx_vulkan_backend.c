@@ -55,8 +55,12 @@
 
 /* SDL2 is already required off Windows (cellPad, cellAudio); here it only
  * opens the optional window. Same include style as those two. */
+#ifdef PS3_SDL3
+#include "ps3_sdl.h"
+#else
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
+#endif
 
 #include <dlfcn.h>
 #include <stddef.h>
@@ -3439,7 +3443,7 @@ int rsx_vulkan_backend_pump_messages(void)
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) quit = 1;
-        else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) quit = 1;
+        else if (e.type == SDL_KEYDOWN && PS3_SDL_KEY(e) == SDLK_ESCAPE) quit = 1;
     }
     return quit ? -1 : 0;
 }
