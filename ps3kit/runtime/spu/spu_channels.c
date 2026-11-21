@@ -5509,3 +5509,12 @@ void spu_trace_rt(spu_context* ctx, uint32_t rt)
 #ifdef __cplusplus
 }
 #endif
+#if defined(__aarch64__) && defined(SPU_A64_FASTFP) && defined(SPU_A64_CHECK_MODE)
+/* validation builds: a fast float op ran outside spu_run_with_halt's SPU float mode */
+void spu_a64_mode_violation(const char* op)
+{
+    fprintf(stderr, "[spu-fp] FATAL: spu_%s executed outside the SPU float mode (FPCR=0x%llx)\n", op,
+            (unsigned long long)spu__fpcr_get());
+    abort();
+}
+#endif

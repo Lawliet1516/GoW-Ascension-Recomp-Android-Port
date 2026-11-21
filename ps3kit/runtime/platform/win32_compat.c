@@ -507,6 +507,11 @@ static void* thread_trampoline(void* p)
 {
     ps3_obj* t = (ps3_obj*)p;
     t_current_thread = t;
+#if defined(__aarch64__) && defined(SPU_A64_FASTFP)
+    /* A new thread inherits its creator's FPCR (measured on Android). Only SPU run loops may be in the SPU float
+     * mode (RZ|FZ); a thread made from inside one must still start in the standard mode. */
+    __asm__ volatile("msr fpcr, xzr");
+#endif
 
     pthread_mutex_lock(&s_lock);
     thread_publish_self_locked(t);

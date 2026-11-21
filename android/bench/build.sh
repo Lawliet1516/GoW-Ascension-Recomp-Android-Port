@@ -36,3 +36,13 @@ for v in scalar neon fastfp; do
       "$HERE/spu_ops_bench.c" -o "$OUT/spu_ops_$v" -lm
 done
 echo built per-op benches
+# integrated test: the real SPU runtime running a lifted, hand-assembled program (needs the host lifter: python3)
+LIFT="$OUT/spuprog_lift"; python3 "$HERE/spuprog/make_prog.py" >/dev/null
+PYTHONPATH="$PS3KIT/tools" python3 "$PS3KIT/tools/spu_lifter.py" --auto-functions "$HERE/spuprog/prog.elf" --output "$LIFT" >/dev/null
+RT=("$SPU/spu_channels.c" "$SPU/spu_drain.c" "$SPU/spu_lockstep.c" "$SPU/spu_coherency.c" "$SPU/spu_workload.c" "$SPU/spurs_policy.c" \
+    "$SPU/spurs_job.c" "$SPU/spu_tsp_weak.c" "$SPU/spu_vm_pagemap.c" "$SPU/spurs_policy_blob_weak.c" "$SPU/spu_interp.c" \
+    "$PS3KIT/runtime/platform/win32_compat.c" "$PS3KIT/runtime/platform/ps3_ucontext.c")
+RF=(-std=gnu17 -O2 -fwrapv -fdeclspec -mcpu=cortex-a78 -ffp-contract=off -w -D_GNU_SOURCE -DSPU_A64_FASTFP -I"$SPU" -I"$PS3KIT/include" -I"$PS3KIT/runtime/platform" -I"$LIFT")
+"$CC" "${RF[@]}" -o "$OUT/spu_run_test" "$HERE/spu_run_test.c" "$LIFT/spu_recomp.c" "${RT[@]}" -lm
+"$CC" "${RF[@]}" -DSPU_A64_CHECK_MODE -o "$OUT/spu_run_test_checked" "$HERE/spu_run_test.c" "$LIFT/spu_recomp.c" "${RT[@]}" -lm
+echo "$OUT/spu_run_test (+_checked)"

@@ -939,6 +939,14 @@ SPU__NV_INLINE u128 spu_fnms(u128 a, u128 b, u128 c) { return spu__nv_fma(a, b, 
  * host's standard mode (cold, out of line). */
 #define SPU__A64_INLINE static inline __attribute__((always_inline))
 #define SPU__A64_SLOW   static inline __attribute__((noinline, cold))
+/* SPU_A64_CHECK_MODE: validation builds verify on every fast op that the thread really is in the SPU float
+ * mode (a missed spu_run_with_halt would otherwise give silently different bits). One mrs per op: not for speed runs. */
+#ifdef SPU_A64_CHECK_MODE
+extern void spu_a64_mode_violation(const char* op);
+#define SPU__A64_CHECK(op) do { if (__builtin_expect((spu__fpcr_get() & SPU_FPCR_SPU_BITS) != SPU_FPCR_SPU_BITS, 0)) spu_a64_mode_violation(op); } while (0)
+#else
+#define SPU__A64_CHECK(op) ((void)0)
+#endif
 SPU__A64_INLINE uint32x4_t spu__a64_ld(u128 a) { return vld1q_u32(a._u32); }
 SPU__A64_INLINE u128 spu__a64_st(uint32x4_t v) { u128 r; vst1q_u32(r._u32, v); return r; }
 SPU__A64_INLINE uint32x4_t spu__a64_bexp(uint32x4_t x) { return vshrq_n_u32(vshlq_n_u32(x, 1), 24); }
@@ -967,6 +975,7 @@ SPU__A64_SLOW u128 spu__a64_fma_slow(u128 a, u128 b, u128 c, uint32_t negp, uint
     SPU_FP_STD_END; return r;
 }
 SPU__A64_INLINE u128 spu__a64_fa(u128 a, u128 b, uint32_t negb) {
+    SPU__A64_CHECK("fa");
     const uint32x4_t x = spu__a64_ld(a), y = veorq_u32(spu__a64_ld(b), vdupq_n_u32(negb));
     const uint32x4_t lim = vdupq_n_u32(253);
     const uint32x4_t big = vorrq_u32(vcgtq_u32(spu__a64_bexp(x), lim), vcgtq_u32(spu__a64_bexp(y), lim));
@@ -977,6 +986,7 @@ SPU__A64_INLINE u128 spu__a64_fa(u128 a, u128 b, uint32_t negb) {
 SPU__A64_INLINE u128 spu_fa(u128 a, u128 b) { return spu__a64_fa(a, b, 0); }
 SPU__A64_INLINE u128 spu_fs(u128 a, u128 b) { return spu__a64_fa(a, b, 0x80000000u); }
 SPU__A64_INLINE u128 spu_fm(u128 a, u128 b) {
+    SPU__A64_CHECK("fm");
     const uint32x4_t x = spu__a64_ld(a), y = spu__a64_ld(b);
     const uint32x4_t ex = spu__a64_bexp(x), ey = spu__a64_bexp(y), lim = vdupq_n_u32(253);
     const uint32x4_t big = vorrq_u32(vorrq_u32(vcgtq_u32(ex, lim), vcgtq_u32(ey, lim)),
@@ -986,6 +996,7 @@ SPU__A64_INLINE u128 spu_fm(u128 a, u128 b) {
     return spu__a64_fm_slow(a, b);
 }
 SPU__A64_INLINE u128 spu__a64_fma(u128 a, u128 b, u128 c, uint32_t negp, uint32_t negc) {
+    SPU__A64_CHECK("fma");
     const uint32x4_t x = veorq_u32(spu__a64_ld(a), vdupq_n_u32(negp)), y = spu__a64_ld(b);
     const uint32x4_t z = veorq_u32(spu__a64_ld(c), vdupq_n_u32(negc));
     const uint32x4_t ex = spu__a64_bexp(x), ey = spu__a64_bexp(y), lim = vdupq_n_u32(253);
