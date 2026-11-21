@@ -38,8 +38,12 @@ file(GLOB_RECURSE RUNTIME_SOURCES "${PS3KIT}/runtime/*.c" "${PS3KIT}/runtime/*.c
 list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/tests/|/runtime/ppu/|/runtime/host/|/runtime/diag/|spu_dispatch_mt\\.c$")
 
 add_library(ps3kit_android STATIC ${HLE_SOURCES} ${RUNTIME_SOURCES})
-# Bring-up stand-ins for the symbols the Windows port provides itself (see the file for the list). Not part of the library.
-add_library(gowa_port_stubs STATIC "${CMAKE_CURRENT_SOURCE_DIR}/host/port_stubs.c")
+# Bring-up stand-ins for the symbols the Windows port provides itself (see the file for the list). Not part of the library, and **off by default**:
+# a build that needs them must say so (-DGOWA_BRINGUP_STUBS=ON), and every stub function announces itself when it first runs.
+option(GOWA_BRINGUP_STUBS "build libgowa_bringup_stubs.a (bring-up tests only; NOT implementations)" OFF)
+if(GOWA_BRINGUP_STUBS)
+    add_library(gowa_bringup_stubs STATIC "${CMAKE_CURRENT_SOURCE_DIR}/host/port_stubs.c")
+endif()
 # The game-agnostic host pieces upstream keeps out of the library (inert reservation/loader hooks) for hosts without a game
 add_library(gowa_host_stubs STATIC "${PS3KIT}/runtime/host/host_stubs.c")
 target_include_directories(gowa_host_stubs PRIVATE ${PS3KIT}/include ${PS3KIT}/runtime ${PS3KIT}/runtime/platform ${PS3KIT}/runtime/ppu)
