@@ -7,3 +7,4 @@ __pycache__/
 build-android/
 android/bench/out/
 android/**/out/
+build-android-fastfp/
