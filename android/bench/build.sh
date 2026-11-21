@@ -40,12 +40,12 @@ echo built per-op benches
 ROOT="$HERE/../.."; LIBDIR="${LIBDIR:-$ROOT/build-android-fastfp}"
 SDL3_ROOT="${SDL3_ROOT:-$HOME/toolchain-bt3/sdl3}"
 if [ ! -f "$LIBDIR/libps3kit_android.a" ]; then
-  CMAKE_EXTRA="-DGOWA_SPU_FASTFP=ON" "$HERE/../build.sh" "$LIBDIR"
+  CMAKE_EXTRA="-DGOWA_SPU_FASTFP=ON -DGOWA_BRINGUP_STUBS=ON" "$HERE/../build.sh" "$LIBDIR"
 fi
 LIFT="$OUT/spuprog_lift"; python3 "$HERE/spuprog/make_prog.py" >/dev/null
 PYTHONPATH="$PS3KIT/tools" python3 "$PS3KIT/tools/spu_lifter.py" --auto-functions "$HERE/spuprog/prog.elf" --output "$LIFT" >/dev/null
 CF=(-std=gnu17 -O2 -fwrapv -mcpu=cortex-a78 -ffp-contract=off -w -D_GNU_SOURCE -DSPU_A64_FASTFP -I"$SPU" -I"$PS3KIT/include" -I"$PS3KIT/runtime" -I"$PS3KIT/runtime/platform" -I"$PS3KIT/runtime/ppu" -I"$LIFT")
-LINK=("$LIBDIR/libgowa_port_stubs.a" "$LIBDIR/libgowa_host_stubs.a" "$LIBDIR/libps3kit_android.a" "$LIBDIR/libgowa_port_stubs.a" "$LIBDIR/libgowa_host_stubs.a" -L"$SDL3_ROOT/lib" -lSDL3 -llog -landroid -ldl -lm)
+LINK=("$LIBDIR/libgowa_bringup_stubs.a" "$LIBDIR/libgowa_host_stubs.a" "$LIBDIR/libps3kit_android.a" "$LIBDIR/libgowa_bringup_stubs.a" "$LIBDIR/libgowa_host_stubs.a" -L"$SDL3_ROOT/lib" -lSDL3 -llog -landroid -ldl -lm)
 CXX="${CC%clang}clang++"
 for v in "" "_checked"; do
   X=(); [ -n "$v" ] && X=(-DSPU_A64_CHECK_MODE)
