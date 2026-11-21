@@ -1,0 +1,418 @@
+switch,line,default(heuristic),nearest comment
+AFFINITY_AB,28369,numeric,/* AFFINITY_AB=<hex mask>: the process alternates between all its
+CAND_AB,8869,off (needs =1),"/* CAND_AB=1: every candidate switch in the same windows (its window tag: ""psosame""): the skip and"
+COMB_AB,28462,off (needs =1),"* blocks. host/comb/comb_env.c turns COMB_AB=1 into the COMB=1 switches plus NEXEC_INLINE_AB=1,"
+DRAWOPT,2775,off (needs =1),static int g_dopt_ab_off;   /* DRAWOPT_AB: this window runs with every cut off (walker thread) */
+DRAWOPT_AB,29032,off (needs =1),"* DRAWOPT_AB=1: every DRAWOPT_AB_WIN (default 3) windows of 5 s, all the"
+DRAWOPT_AB_WIN,29101,numeric,
+DRAWOPT_STATS,29039,off (needs =1),"* only when asked for: DRAWOPT_AB=1, DRAWOPT_VERIFY, DRAWOPT_STATS=1 or"
+DRAWOPT_VERIFY,2806,numeric,"/* DRAWOPT_VERIFY=<n> (test only): every n-th time a cut takes its short way,"
+EDGE6_AB,28431,off (needs =1),"* ascension edge6.c). EDGE6_AB_START=<n>: off (""WARM"" windows) for"
+EDGE6_AB_START,28432,numeric,"* ascension edge6.c). EDGE6_AB_START=<n>: off (""WARM"" windows) for"
+EDGE_BACKOFF_AB,28603,off (needs =1),/* EDGE_BACKOFF_AB=1: the EDGE job's PS3-length back-off (ascension
+EDGE_CEIL_AB,28655,off (needs =1),/* EDGE_CEIL_AB=1 (TEST ONLY): the EDGE job's math stages stubbed
+EDGE_CULL_SCALE_AB,28608,off (needs =1),/* EDGE_CULL_SCALE_AB=1: EDGE's small-triangle cull on the host
+EDGE_HLE_AB,28569,off (needs =1),/* EDGE_HLE_AB=1 (with EDGE_HLE=1): the native EDGE job front end
+EDGE_KERN_AB,28575,off (needs =1),"/* EDGE_KERN_AB=1: the faster EDGE math kernels on and off in turns,"
+EDGE_NOCULL_AB,28448,off (needs =1),
+EDGE_PM_AB,28581,off (needs =1),/* EDGE_PM_AB=1 (with EDGE_PM=1): the native WWS policy-module
+GAME_CLOCK_EA,30034,numeric,"/* GAME_CLOCK_EA=<hex guest address of a big-endian float, seconds per frame> (diagnostic, off by default):"
+GCM_PARK_KICK_AB,28385,off (set),/* GCM_PARK_KICK_AB=1 (with GCM_PARK_KICK=1): the park kick on and
+GCM_PUT_ORDER_AB,28613,off (needs =1),/* GCM_PUT_ORDER_AB=1: the park-head-last SPU PUT (ps3kit
+GCM_ZPASS_OCC_AB,22599,off (needs =1),
+LD_A010_LOAD,853,off (set),static volatile int g_wc_load_on;              /* LD_A010_LOAD in force */
+LD_ALIAS_DBG,23982,off (set),/* LD_ALIAS_DBG also reports the HIT. A texture that aliases a render
+LD_ALPHA_BLEND_FACTOR,25812,?,"{ const char* e = getenv(""LD_ALPHA_BLEND_FACTOR"");   /* =0: act as a GPU without it (testing) */"
+LD_ANISO,2613,numeric,"* game's own, LD_TEX_ANISO), LD_ANISO the same and first: at least that much"
+LD_ASYNC_RINGS,3455,ON (unless =0),"* recycles the current half safely. LD_ASYNC_RINGS=0: the whole rings, as"
+LD_BAR_LAZY,852,?,
+LD_BIND_TRACE,24111,numeric,* LD_BIND_TRACE_DIR=<dir>]: for the first 8 draws into that surface from
+LD_BIND_TRACE_DIR,24113,?,* LD_BIND_TRACE_DIR=<dir>]: for the first 8 draws into that surface from
+LD_BIND_TRACE_FROM,24112,?,"/* LD_BIND_TRACE=<target offset hex> [LD_BIND_TRACE_FROM=<frame>,"
+LD_BLEND_COLOR,2072,ON (unless =0),"* blend uses no constant. LD_BLEND_COLOR=0: never set, as before. */"
+LD_BLEND_FOLD,2135,ON (unless =0),"static int on = -1, force = 0, shader = 1;   /* LD_BLEND_FOLD=0: no folding, as before (A/B) */"
+LD_BLEND_FOLD_FORCE,2136,ON (unless =0),* LD_BLEND_FOLD_FORCE=1 does all this on a GPU with ALPHA_FACTOR too (tests).
+LD_BLEND_SCALE,2137,ON (unless =0),"* targets, MIN/MAX or the unbuffered shader path (LD_BLEND_SCALE=0: never):"
+LD_BLIT_DUMP,7609,?,"/* LD_BLIT_DUMP=<dir>: while the CSV gate is open, read back the first four"
+LD_BLIT_TO_GUEST,7592,off (needs =1),* Opt-in (LD_BLIT_TO_GUEST=1): the readback stalls the GPU every frame
+LD_CAPTURE_AT_FRAME,28866,?,"/* LD_CAPTURE_AT_FRAME=<n>: the same capture at frame n, no key needed"
+LD_CAPTURE_DIR,28878,?,
+LD_CAPTURE_DRAWS,1155,numeric,/* Draws a capture records before it stops (LD_CAPTURE_DRAWS=<n> overrides):
+LD_CAPTURE_KEY,28861,ON (unless =0),
+LD_CB_DEDUP,24328,ON (unless =0),* syncs a wrap costs. LD_CB_DEDUP=0: always copy. */
+LD_CB_GEN,24333,ON (unless =0),"/* LD_CB_GEN (default on; =0: compare the 8 KB): ""nothing changed"" is told"
+LD_CB_MASK,13191,numeric,/* DRAW-COST: on by default with DRAWOPT_CB (exact: LD_CB_MASK_VERIFY; =0 still turns it off) */
+LD_CB_MASK_AB,28622,off (needs =1),* and how many each held; LD_CB_MASK_AB=1 flips it per window. */
+LD_CB_MASK_VERIFY,13225,off (needs =1),/* LD_CB_MASK_VERIFY=1 (test only): every vp_c read in the program's
+LD_CLEAR_TEST,24920,off (set),/* LD_CLEAR_TEST=1: clear to magenta instead of the guest's colour.
+LD_CREDIT,27341,?,"/* OFF by default (user, 2026-11-08: ""okay no watermark""); LD_CREDIT=1 shows it. */"
+LD_CUBE_STRIDE,4764,ON (unless =0),* amber rocks reflected garbage over their interior. LD_CUBE_STRIDE=0: old. */
+LD_DEPTH_BIAS,2310,ON (unless =0),* decode_render_state's LD_DEPTH_BIAS (depth test and POLY_OFFSET_FILL on). */
+LD_DEPTH_BOUNDS,2282,ON (unless =0),"* (OPTIONS2); elsewhere it stays off. LD_DEPTH_BOUNDS=0: ignored, as before. */"
+LD_DEPTH_EQUAL_LEQUAL,2360,off (set),/* LD_DEPTH_EQUAL_LEQUAL=1: a draw that tests EQUAL without writing depth
+LD_DRAW_DUMP,20346,numeric,"/* LD_DRAW_DUMP_SKIP=<n>: pass over the first n gated frames, so the dumped"
+LD_DRAW_DUMP_EVERY,20347,numeric,"/* LD_DRAW_DUMP=<dir> [LD_DRAW_DUMP_EVERY=k, default 10]: in the first"
+LD_DRAW_DUMP_SKIP,20348,numeric,"/* LD_DRAW_DUMP_SKIP=<n>: pass over the first n gated frames, so the dumped"
+LD_DRAW_PROF,24791,off (needs =1),
+LD_DRAW_REUSE,21221,numeric,"if (s_reuse_mode < 0) { const char* e = getenv(""LD_DRAW_REUSE""); s_reuse_mode = e ? atoi(e) : 1; }   /* default on; =0 off */"
+LD_DRAW_REUSE_VERIFY,21281,off (needs =1),
+LD_DUMP_ALPHA,27811,off (needs =1),"/* LD_DUMP_ALPHA=1: an 8-bit target's alpha too, as <path>.a.pgm"
+LD_EARLY_SURF_DROP,21110,ON (unless =0),* count). LD_EARLY_SURF_DROP=0: as before. */
+LD_EDGE_NOREAD_AB,18616,off (needs =1),"/* LD_EDGE_NOREAD_AB=1 (a ceiling test for GPU-EDGE, not for play; see"
+LD_EQ_CHECK,15317,off (needs =1),"static int ld_eq_mode(void)   /* 0 off, 1 every frame (LD_EQ_CHECK=1), 2 sampled (LD_EQ_CHECK=2) */"
+LD_EQ_EVERY_MS,15330,?,* question: one frame in play every LD_EQ_EVERY_MS (default 10000) measures every depth-EQUAL draw as above. Its
+LD_EQ_LEQUAL,15387,off (needs =1),/* STRICT-SEL (test) LD_EQ_LEQUAL=1: also the draws that test LESS_EQUAL without writing depth (blended passes over
+LD_EQ_PIPES,16006,off (needs =1),/* LD_EQ_PIPES=1 (2026-11-07): the per-pipeline lines only on request -- thousands of them at exit
+LD_EQ_ULP,15341,numeric,
+LD_FBDBG,6223,off (set),/* LD_FBDBG=1: account for the PS1 framebuffer specifically
+LD_FD_HELPERS,14707,?,"* PSO-HOLD (2026-11-06): LD_FD_HELPERS=<n> helpers (default 1, as before), =auto: the logical processors the"
+LD_FLOOR_DEFER,14439,ON (unless =0),/* LD_FLOOR_DEFER (default on with LD_FLOOR_ZERO; =0: LD_FLOOR_ZERO's frame
+LD_FLOOR_DUMP,29121,numeric,"* ended and not on one (the game, not its boot menus); LD_FLOOR_DUMP_ALL=1:"
+LD_FLOOR_DUMP_ALL,29122,off (set),"* ended and not on one (the game, not its boot menus); LD_FLOOR_DUMP_ALL=1:"
+LD_FLOOR_DUMP_MAX,29121,numeric,"* LD_FLOOR_DUMP_MAX pairs, default 40). Only holds once a loading screen has"
+LD_FLOOR_DUP_MS,14764,?,
+LD_FLOOR_HOLD_ABS_MS,14372,?,* LD_FLOOR_HOLD_ABS_MS (default 180000) in all. */
+LD_FLOOR_HOLD_MAX_MS,14371,?,"* LD_FLOOR_HOLD_MAX_MS (default 20000: a builder is stuck), or after"
+LD_FLOOR_ZERO,13671,ON (unless =0),/* LD_FLOOR_ZERO (default on; =0 off): no frame is shown with a draw missing
+LD_FORCE_A1_OPAQUE,4175,off (set),"/* LD_FORCE_A1_OPAQUE=1: experiment, not a fix. A PS1 15-bit pixel uses"
+LD_FORCE_COL0,16903,off (set),/* LD_FORCE_COL0=<pso key hex> limits it to one PSO. */
+LD_FORCE_GREEN,16877,off (set),/* LD_FORCE_GREEN=<pso key hex> limits it to one PSO. */
+LD_FORCE_VA,23588,off (set),/* LD_FORCE_VA=1: debug -- inline draws whose UB4 vertex colour (attr 3)
+LD_FP16_TEX,5339,ON (unless =0),static int fp16_on = -1;    /* LD_FP16_TEX=0: the old clamped RGBA8 decode */
+LD_FP_DUMP,16703,?,"/* PSO-HOLD (test; default off) LD_FP_DUMP=<dir>: each fragment program's ucode, once per content, as"
+LD_FP_EXP_FLOAT,16248,ON (unless =0),/* LD_FP_EXP_FLOAT (default on): a float format (and HILO_S8) takes no
+LD_FP_MEMO_CONST,13448,off (needs =1),* rely on it to know the constants did not change. LD_FP_MEMO_CONST_AB=1
+LD_FP_MEMO_CONST_AB,28646,off (needs =1),* LD_FP_MEMO_CONST_AB=1 flips it per window. */
+LD_FP_MEMO_CONST_VERIFY,13463,off (needs =1),"/* LD_FP_MEMO_CONST_VERIFY=1 (test only): what is kept, computed again"
+LD_FP_PROBE,16917,?,/* LD_FP_PROBE=<text>|<expr> matches by content instead: every pixel
+LD_FP_PROBE_MARK,16944,?,"/* LD_FP_PROBE_MARK=""float4 _o1 = "": probe another output (t1). */"
+LD_FRAME_COLOR,27858,ON (unless =0),"/* LD_FRAME_COLOR (default on; =0 off): every 10 s, the average colour of the"
+LD_FRAME_DUMP,12552,numeric,"/* LD_UBER2_DUMP=<n> (picture test, with LD_FRAME_DUMP): up to n frames that drew with twins are dumped"
+LD_FRAME_DUMP_COUNT,29257,?,/* LD_FRAME_DUMP_COUNT=<n>: stop after n dumps (a burst of consecutive
+LD_FRAME_DUMP_EVERY,29247,numeric,"/* LD_FRAME_DUMP=<dir> [+ LD_FRAME_DUMP_EVERY=<n>, default 300]: write the"
+LD_FRAME_DUMP_FROM,29253,?,/* LD_FRAME_DUMP_FROM=<frame>: start dumping there (dense captures of a
+LD_FULLRES_FX,7915,ON (unless =0),"* least LD_FULLRES_FX_TAPS times (default 4: blurs, not single-tap copies or"
+LD_FULLRES_FX_TAPS,7921,numeric,"* least LD_FULLRES_FX_TAPS times (default 4: blurs, not single-tap copies or"
+LD_FXC_REGS,11200,ON (unless =0),
+LD_GPU_LOW_POWER,25532,?,"* LD_GPU_LOW_POWER=1 asks for the low-power one instead. Logged, so a run"
+LD_GPU_WARP,25511,off (needs =1),/* LD_GPU_WARP=1 (a test): Microsoft's software rasterizer (WARP) draws --
+LD_HALF2,8633,ON (unless =0),* into an R16G16_FLOAT copy and bind that. LD_HALF2=0: off. */
+LD_HALF2_DUMP,5381,?,"{ static int dn = 0; const char* dd = getenv(""LD_HALF2_DUMP"");   /* LD_HALF2_DUMP=<dir>: raw bytes, first 16 */"
+LD_HALF2_TEX,5375,ON (unless =0),* to a smooth grey. LD_HALF2_TEX=0: off. */
+LD_HITCH_MS,273,numeric,
+LD_HLSL_DUMP,16959,?,/* LD_HLSL_DUMP=<dir>: files named by the PSO key the draw CSV prints. */
+LD_HLSL_REPLACE,16977,?,"/* LD_HLSL_REPLACE=<dir> (shader mods, 2026-11-15): a pipeline whose generated pixel (vertex) HLSL has"
+LD_HOLE_FILL,26853,ON (unless =0),
+LD_HOLE_MARK,26721,ON (unless =0),"/* LD_HOLE_MARK (SHIMMER, 2026-11-12, host\shimmer; default on with the fill, =0: the old test). The fill told ""written"" from"
+LD_HOLE_MARK_SHOW,26835,off (needs =1),"static int show = -1;   /* LD_HOLE_MARK_SHOW=1 (test only): the holes the marked fill fills, in magenta */"
+LD_LOAD_STATS,6414,off (needs =1),/* LD_LOAD_STATS: is the new key's content already cached under another
+LD_MEMO_BIG,13169,off (needs =1),* changes only how often a scan is needed; LD_MEMO_BIG_AB=1 flips it per
+LD_MEMO_BIG_AB,28634,off (needs =1),* misses by reason); LD_MEMO_BIG_AB=1 flips the size per window. */
+LD_METHOD_DUMP,28992,?,
+LD_NO_DEPTH,2353,off (set),/* LD_NO_DEPTH=1: disable the depth test on every draw. A probe for draws
+LD_NO_SRGB,16422,off (set),* LD_NO_SRGB=1 leaves both off. */
+LD_NULL_DRAW_AB,28414,off (set),/* LD_NULL_DRAW_AB=1: draws translated and not translated in
+LD_PACING_LOG,230,ON (unless =0),/* [pacing] every 10 s (LD_PACING_LOG=0 off): how many monitor refreshes each
+LD_PERF_OVERLAY,28234,off (set),
+LD_PERF_OVERLAY_FPS,28277,numeric,
+LD_PERF_OVERLAY_REALTIME,28788,off (needs =1),/* LD_PERF_OVERLAY_REALTIME=1: the title's clock follows real time (God of
+LD_PLANE_DUMP,5509,numeric,/* LD_PLANE_DUMP=1: write the first few big single-channel (B8) planes
+LD_POST_FAST,24232,ON (unless =0),"{   /* LD_POST_FAST (default on): one ResourceBarrier call, same barriers and order. */"
+LD_PRESENT_DBG,29364,off (set),/* LD_PRESENT_DBG=1: is this surface actually finished? A surface whose last
+LD_PRESENT_LATE,6865,numeric,/* LD_PRESENT_LATE (default 1 = auto; 2 = always; 0 = off). A flip is presented
+LD_PS1_BUF0,23744,off (set),"/* LD_PS1_BUF0=1 -- DIAGNOSTIC, not a fix. Force a 24-bit PS1 VRAM"
+LD_PSO_ASYNC,13798,ON (unless =0),
+LD_PSO_DBG,13598,off (set),/* LD_PSO_DBG=1: name the first bail-out of each kind in get_pso(). Every exit
+LD_PSO_DELAY_MS,13779,off (set),/* LD_PSO_DELAY_MS=<ms> (a test; default 0): every pipeline a builder must
+LD_PSO_DELAY_SLEEP,13781,off (set),* LD_PSO_DELAY_SLEEP=1: sleeps instead. Counted in [floor-zero] total. */
+LD_PSO_DIAG,10628,ON (unless =0),"/* LD_PSO_DIAG (default on; =0 off): where pipeline time goes, by thread. Every"
+LD_PSO_DXC,11335,ON (unless =0),
+LD_PSO_DXC_DIR,11339,?,
+LD_PSO_FAIL_TEST,14086,?,/* Tests of LD_FLOOR_DEFER's recovery (default off). LD_PSO_FAIL_TEST=N: the
+LD_PSO_FORCE_MS,13911,?,static u64 forced_frame_us;   /* this frame's waits past the budget (LD_PSO_FORCE_MS) */
+LD_PSO_HOLD_FRAMES,15232,numeric,
+LD_PSO_HOLD_MAX_MS,15231,numeric,
+LD_PSO_KEYDBG,16620,off (set),"/* LD_PSO_KEYDBG=1: for each new PSO, the hash of every part of its key, so"
+LD_PSO_LIBRARY,9488,?,"ld_dxc_on() ? ""dxil_"" : """", LD_PSO_LIBRARY_VERSION);   /* LD_PSO_DXC: its own file */"
+LD_PSO_LIB_ASYNC,9821,numeric,/* LD_PSO_LIB_ASYNC: a library load is ~0.2 ms on an RTX 5080 but ~10 ms on
+LD_PSO_LOAD_HOLD,15176,off (needs =1),/* Merge 0.1.17a: DEFAULT OFF (LD_PSO_LOAD_HOLD=1 turns it on). A hold stops the walker -- and with it every later
+LD_PSO_LOWPRIO,13862,off (set),"/* Normal priority (LD_PSO_LOWPRIO=1: below normal, as before). Below"
+LD_PSO_MAX_SKIP_MS,13910,?,* ~400 ms on 6 busy cores. LD_PSO_MAX_SKIP_MS=0: no limit. */
+LD_PSO_MEMO,13140,ON (unless =0),"* same. LD_PSO_MEMO=0: computed every draw, as before. */"
+LD_PSO_ONE_COMPILE,11245,ON (unless =0),/* LD_PSO_ONE_COMPILE (default on; =0 off): one fxc per shader text at a time.
+LD_PSO_PRECOMPILE,10393,ON (unless =0),/* LD_PSO_PRECOMPILE (default on; =0 off): every recorded pipeline is built
+LD_PSO_RECIPES,9878,ON (unless =0),/* LD_PSO_RECIPES / LD_PSO_WARM (default on; =0 off): pipeline recipes and the
+LD_PSO_RT_CANON,10106,ON (unless =0),* LD_PSO_RT_CANON (default on): the key is the pipeline DESCRIPTION itself --
+LD_PSO_RT_FREE,10240,ON (unless =0),/* LD_PSO_RT_FREE (default on; =0: the graphics thread probes the caches and
+LD_PSO_SAME,17249,off (needs =1),static ld_pso_metadata s_pso_same_cur;            /* LD_PSO_SAME_VERIFY's copies */
+LD_PSO_SAME_AB,8870,off (needs =1),
+LD_PSO_SAME_DEPTH,17306,ON (unless =0),/* LD_PSO_SAME_DEPTH (default on; =0: no reuse while a depth-format unit is
+LD_PSO_SAME_QUIET,17258,ON (unless =0),/* LD_PSO_SAME_QUIET (default on; =0 off): registers get_pso_full never
+LD_PSO_SAME_VERIFY,17248,off (needs =1),static ld_pso_metadata s_pso_same_cur;            /* LD_PSO_SAME_VERIFY's copies */
+LD_PSO_SAVE_EVERY_S,9622,?,
+LD_PSO_SPLIT,11512,ON (unless =0),"* warm-up, not probes), and only while at most LD_PSO_SPLIT_MAX (4) requests are unfinished. Measured (host\hitch2\NOTES.md): the user's ses"
+LD_PSO_SPLIT_MAX,14045,numeric,/* HITCH2 LD_PSO_SPLIT_MAX (default 4): a split only while at most this many requests are unfinished (a trickle of
+LD_PSO_SPLIT_THREADS,11550,numeric,
+LD_PSO_STUCK_MS,14088,?,* finished pipeline back for LD_PSO_STUCK_MS (default 30000) before giving
+LD_PSO_STUCK_TEST,14087,?,* fails a create once. LD_PSO_STUCK_TEST=N: a builder holds every Nth slot's
+LD_PSO_THREADS,13854,?,
+LD_PSO_URGENT,14051,ON (unless =0),"* builders in order -- except the URGENT LANE (LD_PSO_URGENT, default on; =0"
+LD_PSO_WAIT_FAST,14255,ON (unless =0),
+LD_PSO_WAIT_MS,13909,?,* budget (LD_PSO_WAIT_MS); NULL with g_ld_pso_skip set past it.
+LD_PSO_WARM,10564,?,
+LD_RECORD,29339,?,"/* LD_RECORD=<out.mp4> (boot_main's --record): every presented frame, as"
+LD_RECORDER,15319,?,* LD_RECORDER off; draw reuse is off meanwhile. Variants are not recipes. */
+LD_RES_SCALE,25412,?,"/* LD_RES_SCALE (whole times), else the launcher's PS3_RENDER_SCALE in"
+LD_RES_SCALE_MIN,6806,?,/* LD_RES_SCALE_MIN (default 16): a colour target narrower or shorter than
+LD_RS_LODBIAS,2633,?,"/* LD_RS_LODBIAS=<n> (0 = off): at LD_RES_SCALE s > 1, every mipmapped texture"
+LD_SHADER_STATS,28932,?,/* LD_SHADER_STATS=<frame> (off): count the opcodes and modifiers of every
+LD_SHADOW,16467,ON (unless =0),float ld_shadow_edge[16][2];   /* LD_SHADOW_EDGE: fp_shadow_scale[u].zw */
+LD_SHADOW_EDGE,536,ON (unless =0),* LD_SHADOW_EDGE=0: as before (.zw stay 1). */
+LD_SHADOW_SWAP,16468,ON (unless =0),* LD_SHADOW=0: off; LD_SHADOW_SWAP=0: the decompiler's operand order. */
+LD_SHARPEN,27121,?,"/* LD_SHARPEN=<0..100> (0, off, when unset): contrast-adaptive sharpening of"
+LD_SKIP_BLEND_DISPLAY,23513,off (needs =1),/* LD_SKIP_BLEND_DISPLAY=1: drop blended draws into a display buffer.
+LD_SKIP_NOWRITE,23179,ON (unless =0),/* LD_SKIP_NOWRITE (default on; =0 off): a draw that can write nothing --
+LD_SKIP_PSO,23605,?,"/* LD_SKIP_PSO=<hex key>[,<hex key>...]: drop draws with those CSV"
+LD_SKIP_SAMPLING,23502,numeric,/* LD_SKIP_SAMPLING=<hex offset>: drop draws that sample a texture at that
+LD_SMAA,26902,off (needs =1),"/* LD_SMAA=1: SMAA 1x (luma edges, preset HIGH) on the presented frame. */"
+LD_SMAA_PRESET,26974,?,/* LD_SMAA_PRESET=low|medium|high|ultra (default high): SMAA's quality preset.
+LD_SMP_ALL_UNITS,23755,off (set),* 24 times a second. LD_SMP_ALL_UNITS=1: the old way. */
+LD_SMP_CACHE,3013,?,
+LD_SMP_HASH,3017,ON (unless =0),
+LD_SMP_LOD_RAW,2711,off (set),static int raw = -1;   /* LD_SMP_LOD_RAW=1: the LOD fields exactly as the guest set them */
+LD_SMP_PERSIST,3473,ON (unless =0),/* LD_SMP_PERSIST (default on): the shader-visible sampler tables persist
+LD_SMP_RECYCLE,2975,ON (unless =0),"/* LD_SMP_RECYCLE (default on; =0: the default sampler once full, as before)."
+LD_SMP_ROTATE,8875,ON (unless =0),"if (on < 0) { const char* e = getenv(""LD_SMP_ROTATE""); on = !(e && e[0] == '0'); }   /* default on; =0 off */"
+LD_SMP_ROTATE_AB,28676,off (set),
+LD_STATE_FILTER,3800,ON (unless =0),"* LD_STATE_FILTER=0: every call, as before. */"
+LD_SURF_ALIAS,6774,?,"* evicted, nothing scaled, as before. LD_SURF_ALIAS=2: the pitch is left out"
+LD_SURF_DUMP,29203,numeric,"* count, at LD_SURF_DUMP_FRAME (default 1200)."
+LD_SURF_DUMP_FRAME,29204,numeric,"* count, at LD_SURF_DUMP_FRAME (default 1200)."
+LD_SURF_DUMP_GATE,29214,off (set),/* LD_SURF_DUMP_GATE=<file>: fire when <file> appears instead. */
+LD_SURF_DUMP_ON_VRAM,29210,off (set),/* LD_SURF_DUMP_ON_VRAM=1 waits for PS1 VRAM to hold a drawn frame instead
+LD_SURF_EVICT_FRAMES,6839,?,
+LD_SURF_GN_AB,8864,off (needs =1),
+LD_SURF_GROW_ALIGN,6831,?,"* multiple of LD_SURF_GROW_ALIGN pixels (default 64; 1 = exact), so a clip"
+LD_SURF_GUEST_NEWER,6929,numeric,/* LD_SURF_GUEST_NEWER (default 1: count only; 2: act; 0: off). A texture at a
+LD_SURF_REMAP,6996,ON (unless =0),"* remap (and 0, never set) keeps the plain view. LD_SURF_REMAP=0: as before. */"
+LD_SURF_WB,3126,ON (unless =0),* LD_SURF_WB=0: off. */
+LD_SURF_X32,2261,ON (unless =0),
+LD_SYNC_PRESENT,25684,?,
+LD_TEXRGBA_DUMP,5549,numeric,/* LD_TEXRGBA_DUMP=<hex fmt>: only that base format -- the 12-dump
+LD_TEXSRC_DBG,5006,off (set),/* LD_TEXSRC_DBG=1: is the guest data there AT ALL?
+LD_TEX_ANISO,2584,ON (unless =0),* 4.8 fixed point (RPCS3 fragment_texture::bias). LD_TEX_ANISO (default on):
+LD_TEX_AUDIT,6151,numeric,/* LD_TEX_AUDIT=<frames> (default 240; 0 off): each cached texture is
+LD_TEX_BIAS,16237,off (needs =1),"if (on < 0) { const char* e = getenv(""LD_TEX_BIAS""); on = e && e[0] == '1'; }   /* opt-in: it darkened this title's terrain */"
+LD_TEX_BIND_MEMO,24071,off (needs =1),/* LD_TEX_BIND_MEMO=1 (default off): the unit's last bind this
+LD_TEX_BORDER,2547,ON (unless =0),"* LD_TEX_BORDER=0: black, as before. */"
+LD_TEX_CACHE_CAP,5777,?,* moment later). LD_TEX_CACHE_CAP=1024 LD_TEX_CACHE_MB=0: as before. */
+LD_TEX_CACHE_MB,5789,?,* moment later). LD_TEX_CACHE_CAP=1024 LD_TEX_CACHE_MB=0: as before. */
+LD_TEX_DEDUP,6027,ON (unless =0),* for volumes (LD_VOL_REUSE rewrites those in place). LD_TEX_DEDUP_VERIFY=1
+LD_TEX_DEDUP_VERIFY,6033,off (needs =1),* for volumes (LD_VOL_REUSE rewrites those in place). LD_TEX_DEDUP_VERIFY=1
+LD_TEX_HEAP,4380,ON (unless =0),"* heaps (LD_TEX_HEAP_MB each, default 64) instead of a CreateCommittedResource"
+LD_TEX_HEAP_MB,4387,numeric,"* heaps (LD_TEX_HEAP_MB each, default 64) instead of a CreateCommittedResource"
+LD_TEX_INDEX,5699,ON (unless =0),* finds exactly the entry the scan did. LD_TEX_INDEX=0: the scan. */
+LD_TEX_INTRAFRAME,6127,ON (unless =0),/* LD_TEX_INTRAFRAME (default on): a texture whose content changed in
+LD_TEX_KEY_FULL,5738,ON (unless =0),* LD_TEX_KEY_FULL=0: the old key. */
+LD_TEX_LODBIAS,2578,ON (unless =0),"/* LD_TEX_LODBIAS (default on): TEXTURE_FILTER bits 0-12, the LOD bias, signed"
+LD_TEX_LRU_CHECK,5944,off (needs =1),* the stack the latest -- any of them is equally empty. LD_TEX_LRU_CHECK=1
+LD_TEX_LRU_LIST,5938,ON (unless =0),/* LD_TEX_LRU_LIST (default on; =0: the scans as before): the texture cache's
+LD_TEX_MISS_STATS,5841,off (set),"/* LD_TEX_MISS_STATS=1 (diagnostic, off): what the cache's misses are. Each"
+LD_TEX_RACE,6198,off (set),"/* LD_TEX_RACE=1: hash the SAME source twice, back to back. The two"
+LD_TEX_RECYCLE,4286,ON (unless =0),* LD_TEX_RECYCLE_MB (default 256): how much is kept; the oldest go first. */
+LD_TEX_RECYCLE_MB,4338,numeric,
+LD_TEX_REDO_KEY,28902,off (needs =1),"/* LD_TEX_REDO_KEY=1 (diagnostic, off: F11 is also the window-mode key): F11"
+LD_TEX_VERIFY,6284,numeric,"/* LD_TEX_VERIFY=<n> (diagnostic, off): every n-th frame each bind"
+LD_TEX_WRITEWATCH,4859,ON (unless =0),* thread in God of War: Ascension's combat. LD_TEX_WRITEWATCH=0: always hash. */
+LD_TEX_WW_AB,8871,off (needs =1),
+LD_TEX_WW_EVERY,6154,numeric,/* LD_TEX_WW_EVERY=<n> (default 1: every frame): a texture whose
+LD_TRACE_PSO,23523,?,/* LD_TRACE_PSO=<hex key>: raw vertex attributes + unit-0 texels of the
+LD_TRACE_PSO_FROM,23533,?,/* LD_TRACE_PSO_FROM=<frame>: the first three draws at or after that
+LD_TURBO_LOAD,195,ON (unless =0),"/* LD_TURBO_LOAD (default on; =0 off): a frame of 1-4 draws, a file read in"
+LD_UBER,11828,off (needs =1),*   every draw. LD_UBER_THREADS (4): threads making ubershader pipelines;
+LD_UBER2_DUMP,12551,numeric,"* (frame_1<frame>.ppm, through OCCL_BURST's request), and each one's frame + LD_UBER2_DUMP_AFTER (30) for comparison */"
+LD_UBER2_DUMP_AFTER,12551,numeric,"* (frame_1<frame>.ppm, through OCCL_BURST's request), and each one's frame + LD_UBER2_DUMP_AFTER (30) for comparison */"
+LD_UBER3_PXSTAT,12907,numeric,* rsx_fp_uber_knobs as is) for the top LD_UBER3_PXSTAT_TOP (200). For host\uber3\bench (u3bench). */
+LD_UBER3_PXSTAT_DIR,13003,?,
+LD_UBER3_PXSTAT_TOP,13006,numeric,
+LD_UBER_AFTERLOAD,12595,off (needs =1),"*  LD_UBER_AFTERLOAD=1: in the LD_UBER_LOAD_FRAMES frames after a loading screen (not on the screen itself, not"
+LD_UBER_AL_GPU_MS,12600,numeric,/* UBER6 b: LD_UBER_AL_GPU_MS (with LD_UBER_AFTERLOAD=1; default 64): the frame's GPU-time budget inside the
+LD_UBER_ANYGPU,11836,off (needs =1),"* vendor: off, unless LD_UBER_ANYGPU=1 (a tester). Before the device is known: off for now, asked again. */"
+LD_UBER_BIG_MS,12582,numeric,"s_ub2.big_us = (v = getenv(""LD_UBER_BIG_MS"")) ? atof(v) * 1000.0 : 16000.0;   /* tuned: 16 ms (0: the pixel rule) */"
+LD_UBER_BIG_PX,12575,numeric,
+LD_UBER_BIG_VERTS,12572,numeric,
+LD_UBER_BUDGET,12564,off (needs =1),
+LD_UBER_BURST,12569,numeric,
+LD_UBER_BURST_FRAMES,12570,numeric,
+LD_UBER_COST_K,12583,numeric,"s_ub2.k_prior = (v = getenv(""LD_UBER_COST_K"")) ? atof(v) : ld_uber_fast_on() ? 12.0 : 25.0;   /* UBER3 FAST: 12 */"
+LD_UBER_EQ,12109,off (needs =1),"/* LD_UBER_EQ=1 (test, with LD_EQ_CHECK=2): the twin's depth-EQUAL draws are measured too, by twins of the eq-check's"
+LD_UBER_FAST,11904,off (needs =1),"/* UBER3 FAST (2026-11-12; LD_UBER_FAST=1 with LD_UBER=1, default off): a twin runs a FAST ubershader when its"
+LD_UBER_FORCE,11829,off (needs =1),*   LD_UBER_FORCE=1 (test): every pipeline gets its ubershader twin and draws use it whenever it is ready (also
+LD_UBER_FORCE_AB,11862,numeric,"/* LD_UBER_FORCE_AB=<frames> (with LD_UBER_FORCE=1, the picture check): the ubershader draws in every other block"
+LD_UBER_FORCE_DW,12885,off (needs =1),"if (dw < 0) { const char* e = getenv(""LD_UBER_FORCE_DW""); dw = e && e[0] == '1'; }   /* UBER3 VS (test) */"
+LD_UBER_FORCE_EQ,12884,off (needs =1),"/* LD_UBER_FORCE_EQ=1 (with LD_UBER_FORCE=1, test): only the slots that test depth EQUAL are drawn with their twins"
+LD_UBER_FULL_OPS,12470,numeric,"* ubershader pays its fixed part (~750 us per Mpx, measured) = about LD_UBER_FULL_OPS more operations */"
+LD_UBER_GPU_MS,12581,numeric,"s_ub2.gpu_us = (v = getenv(""LD_UBER_GPU_MS"")) ? atof(v) * 1000.0 : 16000.0;   /* tuned: 16 ms (0: the pixel budget) */"
+LD_UBER_GPU_TIME,12736,?,"/* UBER2 (measure; with LD_UBER=1, LD_UBER_GPU_TIME=0 off): the GPU time of every twin draw -- a timestamp before and"
+LD_UBER_KAUTO,12596,off (needs =1),"*    prior), once 8+ quads are measured, never below LD_UBER_KAUTO_MIN (default prior/16). A fast GPU's real"
+LD_UBER_KAUTO_MIN,12597,numeric,"*    prior), once 8+ quads are measured, never below LD_UBER_KAUTO_MIN (default prior/16). A fast GPU's real"
+LD_UBER_LOAD_FRAMES,12571,numeric,
+LD_UBER_MESH_PCT,12577,numeric,"s_ub2.mesh_pct = (v = getenv(""LD_UBER_MESH_PCT"")) ? atoi(v) : 1;   /* u2-obs: ~27 us a twin draw on average */"
+LD_UBER_NEW_MAX,12568,numeric,"s_ub2.new_max = (v = getenv(""LD_UBER_NEW_MAX"")) ? atoi(v) : 8;   /* tuned (u2-t1/t2) */"
+LD_UBER_PX_BUDGET,12576,numeric,
+LD_UBER_THREADS,12498,numeric,
+LD_UBER_VS,12145,off (needs =1),*   LD_UBER_VS_WAIT=1 (test): a request waits for its class. LD_UBER_VSU_WRONG=1 (test): the interpreter compiled
+LD_UBER_VSU_WRONG,12152,off (needs =1),*   LD_UBER_VS_WAIT=1 (test): a request waits for its class. LD_UBER_VSU_WRONG=1 (test): the interpreter compiled
+LD_UBER_VS_WAIT,12160,off (needs =1),*   LD_UBER_VS_WAIT=1 (test): a request waits for its class. LD_UBER_VSU_WRONG=1 (test): the interpreter compiled
+LD_UBER_VS_WRONG,12460,off (needs =1),"* in get_pso_full, made the same call. LD_UBER_VS_WRONG=1 (negative test only): the other variant. */"
+LD_UNDRAWN_GUEST,23837,ON (unless =0),* LD_UNDRAWN_GUEST=0: off. */
+LD_UNITS,23696,off (set),/* LD_UNITS=1: every enabled texture unit of every draw that samples PS1
+LD_UVDBG,23883,off (set),/* LD_UVDBG=1: the texture coordinates of the draw that samples the PS1
+LD_VB_DUMP,20440,numeric,/* LD_VB_DUMP=<8 hex digits>[:bytes]: when attribute 0's first word
+LD_VIBRANCE,27138,?,"/* LD_VIBRANCE=<0..100> (0, off, when unset): colour that ""pops"" -- the same"
+LD_VOLUME,5248,ON (unless =0),"if (t->dimension == 3) {    /* LD_VOLUME=0: volumes sample white, as before */"
+LD_VOLUME_CLAMP,5110,off (needs =1),"* halves little-endian, LD_VOLUME_CLAMP=1 turns negative and non-finite"
+LD_VOLUME_FLIPY,5108,off (needs =1),"/* LD_VOLUME_FLIPY=1 flips each slice's rows, LD_VOLUME_LE=1 reads the"
+LD_VOLUME_LE,5109,off (needs =1),"/* LD_VOLUME_FLIPY=1 flips each slice's rows, LD_VOLUME_LE=1 reads the"
+LD_VOL_REUSE,5072,ON (unless =0),* current resource for the one decode. LD_VOL_REUSE=0: always a new one. */
+LD_VS_SEL_ALL,10794,off (needs =1),* LD_VS_SEL_ALL=1: every pipeline strict (as LD_VS_STRICT=1) but migrated so. LD_VS_SEL_MIGRATE=0: no migration (the strict ones are built b
+LD_VS_SEL_FLIP,10997,ON (unless =0),
+LD_VS_SEL_GATE,10936,ON (unless =0),* it ran vs 45.9 after it (st-c4-spin). LD_VS_SEL_GATE=0: never waits. */
+LD_VS_SEL_MIGRATE,10868,ON (unless =0),
+LD_VS_SEL_MIN_FPS,10936,ON (unless =0),"* no guest flip in the last second (booting, loading), or the guest flipping at LD_VS_SEL_MIN_FPS (default 58) or more"
+LD_VS_SEL_TEST_SPIN_MS,10988,numeric,"{ /* LD_VS_SEL_TEST_SPIN_MS=n (a test): n ms of busy work after each pipeline, as a driver with a cold cache"
+LD_VS_SEL_THREADS,11016,?,
+LD_VS_SEL_W,10793,ON (unless =0),* against; LD_VS_SEL_W=0: depth-only writers alone) -- decided from the pipeline's own render state when it is
+LD_VS_STRICT,10757,off (set),"/* LD_VS_STRICT (default: on except on NVIDIA; =1 on, =0 off): vertex"
+LD_VTX_ASYNC,3626,numeric,
+LD_VTX_ASYNC_AB,28378,off (set),/* LD_VTX_ASYNC_AB=1 (with LD_VTX_ASYNC): the conversion jobs on and
+LD_VTX_BATCH,18965,ON (unless =0),"/* LD_VTX_BATCH=0: one vertex at a time, as before. LD_VTX_VERIFY=1:"
+LD_VTX_CACHE_PROBE,18208,off (set),
+LD_VTX_RANGE,18297,ON (unless =0),* keeps the per-index path. LD_VTX_RANGE=0: always the per-index path.
+LD_VTX_RAW,18578,off (needs =1),/* LD_VTX_RAW=1: a draw whose vertices are one run of consecutive elements
+LD_VTX_RAW_AB,28670,off (set),/* LD_VTX_RAW_AB=1: the raw vertex path on and off in turns. */
+LD_VTX_RECHECK,18114,off (needs =1),"/* LD_VTX_RECHECK=1 (diagnostic, off): is a draw's vertex data still being"
+LD_VTX_SNAP,3556,ON (unless =0),/* LD_VTX_SNAP (default on with LD_VTX_ASYNC; =0 off): a job takes a copy of
+LD_VTX_VERIFY,18966,off (set),"/* LD_VTX_BATCH=0: one vertex at a time, as before. LD_VTX_VERIFY=1:"
+LD_WALKCUT,848,ON (unless =0),
+LD_WALKCUT_AB,848,ON (unless =0),
+LD_WALKCUT_VERIFY,848,ON (unless =0),
+LD_WB_DEFER,3266,ON (unless =0),"* level). LD_WB_DEFER=0: write back at the present, waiting, as before. */"
+LD_WB_LOG,3156,?,/* LD_WB_LOG=<lines> (default 0): each value stored into guest memory by the
+LD_WB_SYNC,3144,numeric,"/* LD_WB_SYNC (default 0). 2: in a flush that is not a present, the deferred"
+LD_WPOS_RAW,16341,off (set),* fogged the bottom of the menu. LD_WPOS_RAW=1: the old SV_Position. */
+LD_ZBIAS_VS,2302,ON (unless =0),"* pipeline. LD_ZBIAS_VS=0: the constant in DepthBias, as before. */"
+LD_ZCLIP,2413,ON (unless =0),"* past the far plane is not drawn. LD_ZCLIP=0: always clamp, as before. */"
+LD_ZETA_KEEP,8191,ON (unless =0),"* LD_ZETA_KEEP=0: cleared, exact size, as before. */"
+LD_ZPACK,8543,ON (unless =0),* only when the snapshot or the remap changed. LD_ZPACK=0: off. */
+LD_ZPROBE,3633,?,
+LD_ZREAD_DBG,23802,off (set),/* LD_ZREAD_DBG=1: each distinct texture read at a zeta's address. */
+LD_ZREAD_RECENT,7044,ON (unless =0),* Writes are ordered by g_ld_write_seq. LD_ZREAD_RECENT=0: the zeta always. */
+NEXEC_AB,28474,off (needs =1),/* NEXEC_AB=1 (ascension host/spu/wip/nexec): the native EDGE executor on and off in 15 s
+NEXEC_INLINE_AB,28476,?,"/* NEXEC_INLINE_AB=1 (ascension host/spu/wip/ndirect): the same blocks, tag ""ninline"" */"
+NRENDER_INLINE_AB,28487,off (needs =1),/* NRENDER_INLINE_AB=1 (ascension host/spu/wip/nspu): the render jobs inline on and off in 15 s blocks
+NV3089_CPU_SKIP_AB,8868,off (needs =1),
+OCCL,21800,off (needs =1),* pending OCCL_TIMEOUT_MS (8) after its GET to 0xFFFF. Needs the async present pairs. */
+OCCL_AB,21806,off (needs =1),"*   OCCL_AB=1        apply on/off in turns, OCCL_AB_WIN (default 3) [draws] windows each (15 s); off = today"
+OCCL_AB_WIN,21807,numeric,"*   OCCL_AB=1        apply on/off in turns, OCCL_AB_WIN (default 3) [draws] windows each (15 s); off = today"
+OCCL_BURST,22694,numeric,"* reports a frame in the window just ended), at most OCCL_BURST_N (default 2) times per A/B state, started"
+OCCL_BURST_N,22695,numeric,"* reports a frame in the window just ended), at most OCCL_BURST_N (default 2) times per A/B state, started"
+OCCL_CUT_FRAMES,21814,numeric,*   OCCL_CUT_PCT=25 / OCCL_CUT_MIN=24 / OCCL_CUT_FRAMES=3: if of a frame's GETs predicted hidden more than
+OCCL_CUT_MIN,21813,numeric,*   OCCL_CUT_PCT=25 / OCCL_CUT_MIN=24 / OCCL_CUT_FRAMES=3: if of a frame's GETs predicted hidden more than
+OCCL_CUT_PCT,21812,numeric,*   OCCL_CUT_PCT=25 / OCCL_CUT_MIN=24 / OCCL_CUT_FRAMES=3: if of a frame's GETs predicted hidden more than
+OCCL_FLUSH_N,21816,numeric,* command list so far is submitted without a wait every OCCL_FLUSH_N (128) deferred GETs or OCCL_FLUSH_US (1000)
+OCCL_FLUSH_US,21817,numeric,* command list so far is submitted without a wait every OCCL_FLUSH_N (128) deferred GETs or OCCL_FLUSH_US (1000)
+OCCL_GOV,21823,numeric,
+OCCL_GOV_HOLD_MS,21825,numeric,
+OCCL_GOV_PCT,21824,numeric,
+OCCL_GOV_TRIPS,21826,numeric,
+OCCL_GOV_TRIP_WIN_S,21827,numeric,
+OCCL_HIDE_STREAK,21811,numeric,*   OCCL_HIDE_STREAK=2  predict hidden (write 0 at the GET) only for a mesh every instance of which was
+OCCL_KEY,21809,numeric,*   OCCL_KEY=3       the mesh key: 3 (default) the draws' vertex formats + the first draw's vertex 0 position
+OCCL_LATE,21808,numeric,"*   OCCL_LATE=1      (default) the true count goes into the word when the query has resolved, if the word"
+OCCL_LATE_PCT,22544,numeric,/* OCCL_LATE_PCT (2026-11-07): a GPU whose counts keep missing the watchdog (a tester's RX 9070 XT: 8-100 %
+OCCL_MAX_AGE,21810,numeric,*   OCCL_MAX_AGE=4   frames a mesh's last complete result stays usable for a prediction
+OCCL_MEASURE,21772,numeric,
+OCCL_POLL,21815,numeric,*   OCCL_POLL=64     look for resolved queries every that many GET_REPORTs (0: only at flushes)
+OCCL_STRESS_FOREIGN,21831,numeric,
+OCCL_STRESS_GPU_EVERY,21829,off (needs =1),
+OCCL_STRESS_GPU_MS,21828,off (needs =1),
+OCCL_STRESS_NOWD,21897,off (needs =1),"const char* nowd = getenv(""OCCL_STRESS_NOWD"");   /* test only: act as if CreateThread failed */"
+OCCL_STRESS_OLDWAIT,21830,off (needs =1),
+OCCL_STRESS_REGET,21832,numeric,
+OCCL_STRESS_WDGAP,21833,numeric,
+OCCL_STRESS_WDGAP_EVERY,21834,numeric,
+OCCL_TIMEOUT_MS,21818,numeric,* pending OCCL_TIMEOUT_MS (8) after its GET to 0xFFFF. Needs the async present pairs. */
+OCCL_TRACE,21773,numeric,
+PPU_DELAY_AB,28598,?,/* PPU_DELAY_AB=<us> (TEST ONLY): the main thread made slower at
+PPU_SAMPLE_FRAMES,1376,numeric,
+PPU_SAMPLE_PRESENT,1374,off (set),
+PPU_SAMPLE_RUN,1373,off (set),
+PPU_SAMPLE_START,1375,?,
+PS1_EVENTS,30182,off (set),/* PS1_EVENTS=1: the three kernel events the BIOS polls.
+PS1_FBDUMP,30339,?,* PS1_FBDUMP_MIN non-zero words (default 20000).
+PS1_FBDUMP_MIN,30342,numeric,* PS1_FBDUMP_MIN non-zero words (default 20000).
+PS1_GP0HIST,30253,off (set),/* PS1_GP0HIST=1: which GP0 PRIMITIVES the ring actually
+PS1_PC,30070,off (set),/* PS1_PC=1: the R3000 state block (0x76C080) on the same heartbeat.
+PS1_RINGDUMP,30304,off (set),/* PS1_RINGDUMP=1: the last few GP0 command packets.
+PS1_VRAM_READY,30317,numeric,
+PS3_ANISO,2614,numeric,"/* PS3_ANISO=<2..16> (the launcher's ""Anisotropic filtering""; 0 or unset: the"
+PS3_RENDER_SCALE,25413,?,"/* LD_RES_SCALE (whole times), else the launcher's PS3_RENDER_SCALE in"
+PS3_VSYNC,25631,ON (unless =0),"/* PS3_VSYNC=0: present at once (DXGI_PRESENT_ALLOW_TEARING), for the"
+Q4_SND_AB,28444,?,"{ /* Q4_SND_AB=<n> (1-9): n [draws] windows per side (the [audio] line has its own 5 s clock, so a"
+RSX_A010_CAPTURE_ONCE,30412,off (set),
+RSX_A010_GEOM,8808,off (needs =1),
+RSX_A010_PROBE,30414,off (set),
+RSX_A010_SURFACE_DUMP,30394,off (set),
+RSX_A010_SURFACE_EVERY,30396,numeric,
+RSX_D3D_DEBUG,1590,?,
+RSX_DRAW_CSV,8808,off (needs =1),
+RSX_DRAW_CSV_A010_ONLY,20302,off (set),
+RSX_DRAW_CSV_FROM,20289,?,/* RSX_DRAW_CSV_FROM=<frame>: skip rows before that frame. Logging every
+RSX_DRAW_CSV_GATE,20295,?,/* RSX_DRAW_CSV_GATE=<file>: rows only while <file> exists (polled every
+RSX_DUMP_EVERY,30380,numeric,"/* RSX_DUMP_EVERY=N: also dump every Nth frame, not just the first 8 --"
+RSX_FP_CONSTANT_MODE,25388,?,
+RSX_FP_CTRL_AUTO,16214,off (set),* different export mode gets its own PSO. Kill-switch RSX_FP_CTRL_AUTO=1
+RSX_LIVE_DRAW,1962,off (needs =1),* the title-hack drain; RSX_LIVE_DRAW is the one spelling.) */
+RSX_MOVEMENT_PROBE_INTERVAL_MS,29755,?,
+RSX_MOVEMENT_PROOF,29735,?,* promotion controller explicitly enables RSX_MOVEMENT_PROOF. */
+RSX_MOVEMENT_PROOF_DELAY_MS,29754,?,
+RSX_MOVIE_COMPOSITE_UI,19659,off (set),
+RSX_MOVIE_TRACK,25986,off (set),
+RSX_NO_RESTART,18066,off (set),* the phantom vertex. Kill-switch RSX_NO_RESTART shared with the
+RSX_NO_SHADER_DISK_CACHE,8928,?,
+RSX_NO_TEX_REFRESH,6097,?,
+RSX_NO_ZETA_TRACK,8110,?,
+RSX_PARITY_DIAG,29615,?,
+RSX_SCHEDULE_DIAG,1311,off (set),
+RSX_SHADER_CACHE_DIR,8933,?,
+RSX_TARGET_TRACE,19522,off (set),
+RSX_VALIDATION_CAPTURE,29849,?,
+RSX_VALIDATION_DIR,29616,?,
+RSX_VERTEX_DIAG_DIR,25471,?,
+RSX_VERTEX_MODE,25434,?,
+RSX_VERTEX_PATH,25435,?,
+RSX_VERTEX_STATE_TRACE,8812,off (set),
+RSX_VTEX_TRACE,6574,off (set),
+SPURS_NSPUS_AB,28392,off (set),/* SPURS_NSPUS_AB=1 (with SPURS_NSPUS): the extra SPU lanes on
+SPURS_PRIO_AB,28439,off (needs =1),
+SPURS_WID_STATS,28428,off (needs =1),
+SPU_IB_FAST_AB,28399,off (set),/* SPU_IB_FAST_AB=1: the SPU indirect-branch fast path on and
+SPU_LL_AB,28406,off (needs =1),/* SPU_LL_AB=1: the lock-line lock as 64 stripes and as one lock
+SPU_SKIP_AB,28587,off (needs =1),/* SPU_SKIP_AB=1: EDGE lighting/skinning skipped in turns (spu_fnrec.c). */
+TEX_DIAG,6079,off (needs =1),/* TEX_DIAG / TEX_FLAGWATCH (tex_stream_diag.c): texture streaming checks. */
+W2_AB,8790,off (needs =1),* ([w2fifo] line). g_w2_fifo_act: W2_FIFO and (no W2_AB or an ON window); cellGcmSys.c reads it per packet. */
+W2_FIFO,8806,off (needs =1),* ([w2fifo] line). g_w2_fifo_act: W2_FIFO and (no W2_AB or an ON window); cellGcmSys.c reads it per packet. */
+W2_FIFO_VERIFY,8807,off (needs =1),"* tighter method-kind table; W2_FIFO_VERIFY=1: each such packet also walked word by word first, the results compared"
+W2_IDX,8808,off (needs =1),INT g_w2_bv;   /* the BaseVertexLocation of the draw being recorded (0 unless W2_IDX took it) */
+W2_IDX_VERIFY,8810,off (needs =1),"* W2_IDX_VERIFY=1: today's decode runs too and is compared (n, lo, hi, cuts, every index) ([w2idx] line). */"
+W2_INIT,8828,?,"/* W2_INIT=1 (ascension host/w2i, 2026-11-14): w2_ab_init() at the first present, so W2_FIFO / W2_IDX / W2_LEAN"
+W2_LEAN,8811,off (needs =1),"/* W2_LEAN=1 (cut 3b): rsx_live_draw_method's plain path calls rsx_dispatch_method_w2 (the same work, the rare parts"
+W2_NOREAD_ALL,8803,off (needs =1),"volatile int g_w2_noread_all;            /* W2_NOREAD_ALL=1 (ceiling, picture wrong): no draw converts its vertices */"
+W2_OCCL_ARMS,8793,?,int g_w2_occl_arm;                       /* 0: the OCCL_FLUSH_N/US as set; k: arm k of W2_OCCL_ARMS */
+W2_PKSTATS,8805,off (needs =1),volatile int g_w2_pkstats;               /* W2_PKSTATS=1: FIFO packet classes per window (cellGcmSys.c counts) */
+W2_WWMEAS,8804,off (needs =1),"volatile int g_w2_wwmeas;                /* W2_WWMEAS=1: one per-frame GetWriteWatch(reset) over the touched 16 MB regions, timed */"
+WALK_AB,17188,numeric,"static int g_wk_ab_off;          /* WALK_AB: this window runs with W_VDIRECT off (walker thread, between frames) */"
+W_VDIRECT,17183,numeric,static int s_wk_vcheck_gate = 1; /* W_VDIRECT_CHECK_MIN_DRAWS: the last frame had enough draws */
+W_VDIRECT_CHECK,17185,numeric,static int s_wk_vcheck_gate = 1; /* W_VDIRECT_CHECK_MIN_DRAWS: the last frame had enough draws */
+W_VDIRECT_CHECK_MIN_DRAWS,17186,numeric,static int s_wk_vcheck_gate = 1; /* W_VDIRECT_CHECK_MIN_DRAWS: the last frame had enough draws */
