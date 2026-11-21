@@ -36,13 +36,25 @@ for v in scalar neon fastfp; do
       "$HERE/spu_ops_bench.c" -o "$OUT/spu_ops_$v" -lm
 done
 echo built per-op benches
-# integrated test: the real SPU runtime running a lifted, hand-assembled program (needs the host lifter: python3)
+# integrated tests: the real runtime library (built with SPU_A64_FASTFP) + a lifted, hand-assembled SPU program
+ROOT="$HERE/../.."; LIBDIR="${LIBDIR:-$ROOT/build-android-fastfp}"
+SDL3_ROOT="${SDL3_ROOT:-$HOME/toolchain-bt3/sdl3}"
+if [ ! -f "$LIBDIR/libps3kit_android.a" ]; then
+  CMAKE_EXTRA="-DGOWA_SPU_FASTFP=ON" "$HERE/../build.sh" "$LIBDIR"
+fi
 LIFT="$OUT/spuprog_lift"; python3 "$HERE/spuprog/make_prog.py" >/dev/null
 PYTHONPATH="$PS3KIT/tools" python3 "$PS3KIT/tools/spu_lifter.py" --auto-functions "$HERE/spuprog/prog.elf" --output "$LIFT" >/dev/null
-RT=("$SPU/spu_channels.c" "$SPU/spu_drain.c" "$SPU/spu_lockstep.c" "$SPU/spu_coherency.c" "$SPU/spu_workload.c" "$SPU/spurs_policy.c" \
-    "$SPU/spurs_job.c" "$SPU/spu_tsp_weak.c" "$SPU/spu_vm_pagemap.c" "$SPU/spurs_policy_blob_weak.c" "$SPU/spu_interp.c" \
-    "$PS3KIT/runtime/platform/win32_compat.c" "$PS3KIT/runtime/platform/ps3_ucontext.c")
-RF=(-std=gnu17 -O2 -fwrapv -fdeclspec -mcpu=cortex-a78 -ffp-contract=off -w -D_GNU_SOURCE -DSPU_A64_FASTFP -I"$SPU" -I"$PS3KIT/include" -I"$PS3KIT/runtime/platform" -I"$LIFT")
-"$CC" "${RF[@]}" -o "$OUT/spu_run_test" "$HERE/spu_run_test.c" "$LIFT/spu_recomp.c" "${RT[@]}" -lm
-"$CC" "${RF[@]}" -DSPU_A64_CHECK_MODE -o "$OUT/spu_run_test_checked" "$HERE/spu_run_test.c" "$LIFT/spu_recomp.c" "${RT[@]}" -lm
-echo "$OUT/spu_run_test (+_checked)"
+CF=(-std=gnu17 -O2 -fwrapv -mcpu=cortex-a78 -ffp-contract=off -w -D_GNU_SOURCE -DSPU_A64_FASTFP -I"$SPU" -I"$PS3KIT/include" -I"$PS3KIT/runtime" -I"$PS3KIT/runtime/platform" -I"$PS3KIT/runtime/ppu" -I"$LIFT")
+LINK=("$LIBDIR/libgowa_port_stubs.a" "$LIBDIR/libgowa_host_stubs.a" "$LIBDIR/libps3kit_android.a" "$LIBDIR/libgowa_port_stubs.a" "$LIBDIR/libgowa_host_stubs.a" -L"$SDL3_ROOT/lib" -lSDL3 -llog -landroid -ldl -lm)
+CXX="${CC%clang}clang++"
+for v in "" "_checked"; do
+  X=(); [ -n "$v" ] && X=(-DSPU_A64_CHECK_MODE)
+  "$CC" "${CF[@]}" "${X[@]}" -c "$HERE/spu_run_test.c" -o "$OUT/spu_run_test$v.o"
+  "$CC" "${CF[@]}" "${X[@]}" -c "$LIFT/spu_recomp.c" -o "$OUT/spu_recomp$v.o"
+  "$CXX" -o "$OUT/spu_run_test$v" "$OUT/spu_run_test$v.o" "$OUT/spu_recomp$v.o" "${LINK[@]}"
+done
+"$CC" -O2 -w "$HERE/vkprobe.c" -o "$OUT/vkprobe" -ldl
+"$CC" -O2 -w -c "$HERE/vk_smoke.c" -o "$OUT/vk_smoke.o"
+"$CXX" -o "$OUT/vk_smoke" "$OUT/vk_smoke.o" "${LINK[@]}"
+"$CC" -O1 "$HERE/fpcr_probe.c" -o "$OUT/fpcr_probe"
+echo "run on the phone (push libSDL3.so too, LD_LIBRARY_PATH=.): spu_run_test spu_run_test_checked vk_smoke vkprobe fpcr_probe"
