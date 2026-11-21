@@ -17,6 +17,7 @@ set(SDL3_ROOT "" CACHE PATH "SDL3 prefix with include/ and lib/libSDL3.so")
 # 2.4 GHz) + 4x Cortex-A55 (cpu0-3, 1.96 GHz); ARMv8.2-A with fp16 and dotprod, NO sve/sve2/bf16/i8mm.
 # (-mcpu=cortex-a710 compiles but dies with SIGILL there.)
 set(GOWA_ARCH_FLAGS "-mcpu=cortex-a78" CACHE STRING "CPU target for the big cores")
+option(GOWA_SPU_FASTFP "SPU float ops through the FPCR RZ|FZ fast path (spu_helpers.h; bit-exact vs the exact path, experimental)" OFF)
 set(GOWA_LIFTED_DIR "" CACHE PATH "Directory with the lifter output (ppu_recomp.h, ...). Empty = runtime library only")
 
 # --- sources (mirrors ps3kit/CMakeLists.txt) ------------------------------
@@ -51,6 +52,10 @@ endforeach()
 target_include_directories(ps3kit_android PRIVATE ${PS3KIT}/runtime ${PS3KIT}/libs)
 
 target_compile_definitions(ps3kit_android PUBLIC PS3_SDL3=1 _GNU_SOURCE)
+if(GOWA_SPU_FASTFP)
+    # PUBLIC: every translation unit that includes spu_helpers.h (the lifted SPU code too) must agree
+    target_compile_definitions(ps3kit_android PUBLIC SPU_A64_FASTFP=1)
+endif()
 target_compile_options(ps3kit_android PRIVATE
     -O2 -fno-strict-aliasing -fdeclspec
     # PPC fmadd must stay a fused op only where the lifter says so; arm64 clang

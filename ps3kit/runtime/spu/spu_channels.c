@@ -1010,17 +1010,29 @@ int spu_run_with_halt(void (*entry)(spu_context*), spu_context* ctx)
     if (s_fast_fp < 0) { const char* e = getenv("SPU_FAST_FP"); s_fast_fp = !(e && e[0] == '0'); }
     const unsigned csr_saved = _mm_getcsr();
     if (s_fast_fp) _mm_setcsr(csr_saved | SPU_MXCSR_SPU_BITS);
+#define SPU_REASSERT_FP_MODE() ((void)0)
+#elif defined(__aarch64__) && defined(SPU_A64_FASTFP)
+    /* AArch64: FPCR RZ|FZ for the run (spu_helpers.h, spu__a64_*), thread-local state saved here and put back
+     * below. Unlike x86's MXCSR, bionic's longjmp does NOT restore FPCR (measured: android/bench/fpcr_probe.c), so the
+     * halt landing pads set the mode again by hand. The float helpers assume this mode (there is no per-op test),
+     * so this build has no SPU_FAST_FP=0 switch. */
+    const uint64_t fpcr_saved = spu_a64_fp_enter();
+#define SPU_REASSERT_FP_MODE() spu__fpcr_set(spu__fpcr_get() | SPU_FPCR_SPU_BITS)
+#else
+#define SPU_REASSERT_FP_MODE() ((void)0)
 #endif
     /* spu_drain.c: SPU_DRAIN with the step check inlined (SPU_STEP_INLINE). */
     extern int spu_step_inline(void);
     extern void spu_drain_top(spu_context*);
     switch (setjmp(s_spu_halt_env)) {
     case 1:
+        SPU_REASSERT_FP_MODE();
         halted = 1;
         g_spu_trampoline_fn = 0;
         if (dir_on) t_spu_direct.depth = ~0u;
         break;
     case 2:
+        SPU_REASSERT_FP_MODE();
         /* A one-way guest stack reset invalidates every lifted host caller.
          * Re-enter its target with the same guest state on the driver stack. */
         ctx->host_depth = 0;
@@ -1052,6 +1064,8 @@ int spu_run_with_halt(void (*entry)(spu_context*), spu_context* ctx)
     }
 #if defined(__x86_64__) || defined(_M_X64)
     _mm_setcsr(csr_saved);
+#elif defined(__aarch64__) && defined(SPU_A64_FASTFP)
+    spu_a64_fp_leave(fpcr_saved);
 #endif
     yz_lockstep_unregister(ctx);   /* leave the ring; hand the token onward */
     s_spu_halt_armed = outer_armed;

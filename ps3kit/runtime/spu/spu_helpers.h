@@ -650,6 +650,15 @@ static inline uint32_t spu__fma_lane(uint32_t x, uint32_t y, uint32_t z, uint32_
 #define SPU_FP_STD_BEGIN const unsigned spu__csr_saved = _mm_getcsr(); \
     if (spu__csr_saved & SPU_MXCSR_SPU_BITS) _mm_setcsr(spu__csr_saved & ~SPU_MXCSR_SPU_BITS)
 #define SPU_FP_STD_END if (spu__csr_saved & SPU_MXCSR_SPU_BITS) _mm_setcsr(spu__csr_saved)
+#elif defined(__aarch64__) && defined(SPU_A64_FASTFP)
+/* AArch64 SPU float mode: FPCR.RMode = RZ (bits 23:22 = 11) and FZ (bit 24) -- single-precision
+ * truncation with denormal operands and results flushed to zero, the SPU's own arithmetic. */
+#define SPU_FPCR_SPU_BITS 0x01C00000u
+static inline uint64_t spu__fpcr_get(void) { uint64_t v; __asm__ volatile("mrs %0, fpcr" : "=r"(v)); return v; }
+static inline void spu__fpcr_set(uint64_t v) { __asm__ volatile("msr fpcr, %0" :: "r"(v)); }
+#define SPU_FP_STD_BEGIN const uint64_t spu__csr_saved = spu__fpcr_get(); \
+    if (spu__csr_saved & SPU_FPCR_SPU_BITS) spu__fpcr_set(spu__csr_saved & ~(uint64_t)SPU_FPCR_SPU_BITS)
+#define SPU_FP_STD_END if (spu__csr_saved & SPU_FPCR_SPU_BITS) spu__fpcr_set(spu__csr_saved)
 #else
 #define SPU_FP_STD_BEGIN (void)0
 #define SPU_FP_STD_END (void)0
@@ -876,6 +885,7 @@ SPU__NV_INLINE u128 spu__nv_fa(u128 a, u128 b, uint32_t negb) {
     if (!spu__nv_all4(ok)) r = spu__fa_fix(r, ok, xa, yb, negb);
     return spu__nv_u128(r);
 }
+#if !defined(SPU_A64_FASTFP)
 SPU__NV_INLINE u128 spu_fa(u128 a, u128 b) { return spu__nv_fa(a, b, 0); }
 SPU__NV_INLINE u128 spu_fs(u128 a, u128 b) { return spu__nv_fa(a, b, 0x80000000u); }
 SPU__NV_INLINE u128 spu_fm(u128 a, u128 b) {
@@ -888,6 +898,7 @@ SPU__NV_INLINE u128 spu_fm(u128 a, u128 b) {
     if (!spu__nv_all4(ok)) r = spu__fm_fix(r, ok, x, y);
     return spu__nv_u128(r);
 }
+#endif /* !SPU_A64_FASTFP */
 /* p + z in double with its exact rounding error (Knuth's TwoSum: round to nearest, no overflow
  * -- the operands here are at most 2^257). *err == 0 means the sum was exact. */
 SPU__NV_INLINE float64x2_t spu__nv_twosum(float64x2_t p, float64x2_t z, float64x2_t* err) {
@@ -913,9 +924,84 @@ SPU__NV_INLINE u128 spu__nv_fma(u128 a, u128 b, u128 c, uint32_t negp, uint32_t 
     if (!spu__nv_all4(ok)) r = spu__fma_fix(r, ok, xa, y, zc, negp, negc);
     return spu__nv_u128(r);
 }
+#if !defined(SPU_A64_FASTFP)
 SPU__NV_INLINE u128 spu_fma(u128 a, u128 b, u128 c)  { return spu__nv_fma(a, b, c, 0, 0); }            /* a*b + c */
 SPU__NV_INLINE u128 spu_fms(u128 a, u128 b, u128 c)  { return spu__nv_fma(a, b, c, 0, 0x80000000u); }  /* a*b - c */
 SPU__NV_INLINE u128 spu_fnms(u128 a, u128 b, u128 c) { return spu__nv_fma(a, b, c, 0x80000000u, 0); }  /* c - a*b */
+#else
+/* ---- AArch64 FPCR fast path (opt-in: -DSPU_A64_FASTFP) -------------------------------------
+ * The x86 port's approach (see spu__xs_* below) on NEON. While the thread runs SPU code FPCR is
+ * RZ|FZ (spu_a64_fp_enter), so one fadd/fmul/fmla is the SPU's truncating, denormal-flushing
+ * single operation, provided no lane can leave the ordinary range: the SPU has no infinity and
+ * keeps biased exponent 255 as an ordinary number, which the host would turn into Inf/NaN.
+ * Operands at exponent <= 253 and, for products, exponent sums within the bounds the x86 path
+ * uses (380 / 379) cannot overflow. Everything else goes to the exact per-lane path in the
+ * host's standard mode (cold, out of line). */
+#define SPU__A64_INLINE static inline __attribute__((always_inline))
+#define SPU__A64_SLOW   static inline __attribute__((noinline, cold))
+SPU__A64_INLINE uint32x4_t spu__a64_ld(u128 a) { return vld1q_u32(a._u32); }
+SPU__A64_INLINE u128 spu__a64_st(uint32x4_t v) { u128 r; vst1q_u32(r._u32, v); return r; }
+SPU__A64_INLINE uint32x4_t spu__a64_bexp(uint32x4_t x) { return vshrq_n_u32(vshlq_n_u32(x, 1), 24); }
+/* the sign cleared where the result is zero (the SPU never produces -0): r + 0.0 under RZ */
+SPU__A64_INLINE uint32x4_t spu__a64_pos0(float32x4_t r) { return vreinterpretq_u32_f32(vaddq_f32(r, vdupq_n_f32(0.0f))); }
+SPU__A64_INLINE int spu__a64_any(uint32x4_t m) { return vmaxvq_u32(m) != 0; }
+#ifdef SPU_A64_COUNT   /* diagnostics: how often the exact path is taken */
+extern unsigned long long spu_a64_slow_calls;
+#define SPU__A64_COUNT() (++spu_a64_slow_calls)
+#else
+#define SPU__A64_COUNT() ((void)0)
+#endif
+SPU__A64_SLOW u128 spu__a64_fa_slow(u128 a, u128 b, uint32_t negb) {
+    SPU__A64_COUNT(); SPU_FP_STD_BEGIN; u128 r;
+    for (int i = 0; i < 4; i++) r._u32[i] = spu__fa_any(a._u32[i], b._u32[i] ^ negb);
+    SPU_FP_STD_END; return r;
+}
+SPU__A64_SLOW u128 spu__a64_fm_slow(u128 a, u128 b) {
+    SPU__A64_COUNT(); SPU_FP_STD_BEGIN; u128 r;
+    for (int i = 0; i < 4; i++) r._u32[i] = spu__fm_any(a._u32[i], b._u32[i]);
+    SPU_FP_STD_END; return r;
+}
+SPU__A64_SLOW u128 spu__a64_fma_slow(u128 a, u128 b, u128 c, uint32_t negp, uint32_t negc) {
+    SPU__A64_COUNT(); SPU_FP_STD_BEGIN; u128 r;
+    for (int i = 0; i < 4; i++) r._u32[i] = spu__fma_any(a._u32[i], b._u32[i], c._u32[i], negp, negc);
+    SPU_FP_STD_END; return r;
+}
+SPU__A64_INLINE u128 spu__a64_fa(u128 a, u128 b, uint32_t negb) {
+    const uint32x4_t x = spu__a64_ld(a), y = veorq_u32(spu__a64_ld(b), vdupq_n_u32(negb));
+    const uint32x4_t lim = vdupq_n_u32(253);
+    const uint32x4_t big = vorrq_u32(vcgtq_u32(spu__a64_bexp(x), lim), vcgtq_u32(spu__a64_bexp(y), lim));
+    if (__builtin_expect(!spu__a64_any(big), 1))
+        return spu__a64_st(spu__a64_pos0(vaddq_f32(vreinterpretq_f32_u32(x), vreinterpretq_f32_u32(y))));
+    return spu__a64_fa_slow(a, b, negb);
+}
+SPU__A64_INLINE u128 spu_fa(u128 a, u128 b) { return spu__a64_fa(a, b, 0); }
+SPU__A64_INLINE u128 spu_fs(u128 a, u128 b) { return spu__a64_fa(a, b, 0x80000000u); }
+SPU__A64_INLINE u128 spu_fm(u128 a, u128 b) {
+    const uint32x4_t x = spu__a64_ld(a), y = spu__a64_ld(b);
+    const uint32x4_t ex = spu__a64_bexp(x), ey = spu__a64_bexp(y), lim = vdupq_n_u32(253);
+    const uint32x4_t big = vorrq_u32(vorrq_u32(vcgtq_u32(ex, lim), vcgtq_u32(ey, lim)),
+                                     vcgtq_u32(vaddq_u32(ex, ey), vdupq_n_u32(380)));
+    if (__builtin_expect(!spu__a64_any(big), 1))
+        return spu__a64_st(spu__a64_pos0(vmulq_f32(vreinterpretq_f32_u32(x), vreinterpretq_f32_u32(y))));
+    return spu__a64_fm_slow(a, b);
+}
+SPU__A64_INLINE u128 spu__a64_fma(u128 a, u128 b, u128 c, uint32_t negp, uint32_t negc) {
+    const uint32x4_t x = veorq_u32(spu__a64_ld(a), vdupq_n_u32(negp)), y = spu__a64_ld(b);
+    const uint32x4_t z = veorq_u32(spu__a64_ld(c), vdupq_n_u32(negc));
+    const uint32x4_t ex = spu__a64_bexp(x), ey = spu__a64_bexp(y), lim = vdupq_n_u32(253);
+    const uint32x4_t big = vorrq_u32(vorrq_u32(vcgtq_u32(ex, lim), vcgtq_u32(ey, lim)),
+                                     vorrq_u32(vcgtq_u32(spu__a64_bexp(z), lim), vcgtq_u32(vaddq_u32(ex, ey), vdupq_n_u32(379))));
+    if (__builtin_expect(!spu__a64_any(big), 1))
+        return spu__a64_st(spu__a64_pos0(vfmaq_f32(vreinterpretq_f32_u32(z), vreinterpretq_f32_u32(x), vreinterpretq_f32_u32(y))));
+    return spu__a64_fma_slow(a, b, c, negp, negc);
+}
+SPU__A64_INLINE u128 spu_fma(u128 a, u128 b, u128 c)  { return spu__a64_fma(a, b, c, 0, 0); }
+SPU__A64_INLINE u128 spu_fms(u128 a, u128 b, u128 c)  { return spu__a64_fma(a, b, c, 0, 0x80000000u); }
+SPU__A64_INLINE u128 spu_fnms(u128 a, u128 b, u128 c) { return spu__a64_fma(a, b, c, 0x80000000u, 0); }
+/* Enter/leave the SPU float mode on this thread (the runtime calls these around SPU code). */
+static inline uint64_t spu_a64_fp_enter(void) { const uint64_t s = spu__fpcr_get(); spu__fpcr_set(s | SPU_FPCR_SPU_BITS); return s; }
+static inline void spu_a64_fp_leave(uint64_t saved) { spu__fpcr_set(saved); }
+#endif
 #elif defined(__SSE4_1__) && !defined(SPU_SCALAR_HELPERS)
 #include <smmintrin.h>
 #if defined(__FMA__)
@@ -2190,6 +2276,10 @@ static inline u128 spu_xswd(u128 a) {
     const uint32x4_t x = spu__ld(a);
     return spu__st(vtrn2q_u32(vreinterpretq_u32_s32(vshrq_n_s32(vreinterpretq_s32_u32(x), 31)), x));
 }
+#if defined(SPU_A64_ORX_NEON)
+/* Measured on a Cortex-A78 (Snapdragon 7s Gen 2): this vext chain takes 8.3 ns latency / 1.22 ns throughput
+ * against 5.4 / 1.02 for the scalar fold below, three runs each (android/bench/RESULTS.md). The scalar form is
+ * the default; -DSPU_A64_ORX_NEON selects this one. */
 static inline u128 spu_orx(u128 a) {
     /* fold the four words onto word 0 without leaving the vector registers */
     uint32x4_t x = spu__ld(a);
@@ -2197,6 +2287,9 @@ static inline u128 spu_orx(u128 a) {
     x = vorrq_u32(x, vextq_u32(x, x, 1));
     return spu__st(vandq_u32(x, vreinterpretq_u32_u64(vsetq_lane_u64(0xFFFFFFFFull, vdupq_n_u64(0), 0))));
 }
+#else
+static inline u128 spu_orx(u128 a) { return spu_orx_ref(a); }
+#endif
 static inline u128 spu_gb(u128 a) {
     static const uint32_t w[4] = {8, 4, 2, 1};
     return spu_pref_u32(vaddvq_u32(vmulq_u32(vandq_u32(spu__ld(a), vdupq_n_u32(1)), vld1q_u32(w))));
