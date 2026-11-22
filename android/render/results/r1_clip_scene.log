@@ -1,0 +1,16 @@
+[host] backend: Vulkan
+[RSX vulkan] device 0: Adreno (TM) 710 (type 1, api 1.1.128)
+[RSX vulkan] using device 0: Adreno (TM) 710
+[RSX vulkan] guest programs: on (HLSL -> SPIR-V through glslang)
+[rsx engine] register-file draw engine up (1280x720)
+[RSX vulkan] register-file draw engine path
+[RSX vulkan] offscreen target 1280x720 ready, depth format 130 (ps3recomp)
+[rsx engine] surface 0:0x00000000 1280x720 fmt 3
+[rsx engine] pipeline 4540e9af7dc69e60: guest vp 3, fp 1, 0 constants, fp e2f661b68faa1a18 -> ok
+[cellGcmSys] Init(cmdSize=0x10000, ioSize=0x200000, ioAddr=0x00100000)
+[host] gcm context data @ 0x00400010
+[cellGcmSys] SetDisplayBuffer(id=0, offset=0x0, pitch=5120, 1280x720)
+[host] clear colour through the FIFO: 0xFF101830 (expected 0xFF101830) OK
+[host] presented 1 frame(s)
+[host] presented pixel: 0xFFFF0000 (expected 0xFF101830) MISMATCH
+[host] draws through guest programs: 1 OK

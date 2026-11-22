@@ -123,6 +123,14 @@ if(GOWA_RENDER_UPSTREAM)
     endif()
     target_link_libraries(gowa_render_host PRIVATE gowa_render_shims ps3kit_android gowa_render_shims ${GOWA_RENDER_BRINGUP_STUBS} OpenSLES)
     set_target_properties(gowa_render_host PROPERTIES LINKER_LANGUAGE CXX)
+    # the same runner as a shared library with a JNI entry, to run inside a debuggable APK (debug layers only load in app processes)
+    add_library(gowa_scenes SHARED "${CMAKE_CURRENT_SOURCE_DIR}/../render/host/host_posix.c" "${CMAKE_CURRENT_SOURCE_DIR}/../render/host/host_stubs.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/render/apk/native/scene_jni.c")
+    target_compile_definitions(gowa_scenes PRIVATE main=gowa_host_main)
+    target_include_directories(gowa_scenes PRIVATE ${PS3KIT}/runtime/host "${CMAKE_CURRENT_SOURCE_DIR}/../render/libs/video" "${CMAKE_CURRENT_SOURCE_DIR}/../render/include" ${PS3KIT}/include ${PS3KIT}/runtime)
+    target_link_libraries(gowa_scenes PRIVATE gowa_render_shims ps3kit_android gowa_render_shims ${GOWA_RENDER_BRINGUP_STUBS} OpenSLES GLESv1_CM GLESv2 EGL)
+    set_target_properties(gowa_scenes PROPERTIES LINKER_LANGUAGE CXX)
+    target_link_options(gowa_scenes PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/render/apk/native/exports.map")   # export only the JNI entry so --gc-sections drops what the exe also drops
 endif()
 
 # --- benchmarks (no game needed) --------------------------------------------
