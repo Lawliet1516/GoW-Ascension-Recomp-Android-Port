@@ -26,6 +26,7 @@
  */
 
 #include "rsx_shader_spirv.h"
+#include "rsx_spv_clipblock.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,6 +114,11 @@ int translate(const char* hlsl, int stage, std::vector<unsigned int>& spirv,
     if (spirv.empty()) {
         put_log(log, log_size, "SPIR-V generation", logger.getAllMessages().c_str());
         return -1;
+    }
+    /* Adreno 710 ignores a standalone BuiltIn ClipDistance output: declare it as a Block member (see rsx_spv_clipblock.h). PS3RECOMP_SPV_CLIPBLOCK=0 turns it off. */
+    if (stage == RSX_SHADER_STAGE_VERTEX) {
+        static const bool on = !(getenv("PS3RECOMP_SPV_CLIPBLOCK") && getenv("PS3RECOMP_SPV_CLIPBLOCK")[0] == '0');
+        if (on) rsx_spv::put_clipdistance_in_block(spirv);
     }
     return 0;
 }
