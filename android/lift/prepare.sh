@@ -17,6 +17,7 @@ WORK="${WORK_DIR:-$REPO/work}"; PRISTINE="$WORK/pristine/EBOOT.ELF"; PATCHDIR="$
 SITES="$META/patch_sites.json"; TABLE="$ASC/host/ascension_patch_table.inc"; JM="$WORK/jobmods"
 PY="${PYTHON:-python3}"; FORCE=0; DRY=0; JOBS="$(nproc)"
 while [ $# -gt 0 ]; do case "$1" in --force) FORCE=1;; --dry-run) DRY=1;; -j) JOBS="$2"; shift;; *) echo "unknown option $1"; exit 2;; esac; shift; done
+. "$HERE/lift_stage.sh"   # staged outputs: a step is done only when its sealed output verifies (see that file)
 
 step() {  # step "name" logfile command...
   local name="$1" log="$2"; shift 2; echo "== $name (log: $log)"
@@ -46,9 +47,10 @@ if [ ! -f "$PRISTINE" ]; then
   [ $DRY = 1 ] && { echo "(dry run: everything else checked and present)"; exit 0; }
   exit 1
 fi
-echo "EBOOT.ELF md5 $(md5sum "$PRISTINE" | cut -d' ' -f1)"
+MD5="$(md5sum "$PRISTINE" | cut -d' ' -f1)"; echo "EBOOT.ELF md5 $MD5"
 # --dry-run changes nothing: no directory, no file, no temporary is made from here on (step() only prints in that mode)
 [ $DRY = 1 ] || mkdir -p "$LOGS" "$PATCHDIR" "$META/spu"
+sum_of() { cat "$@" | sha1sum | cut -c1-12; }   # what a stamp records about the tools and data a step reads
 
 # ---- 1. the SPU job modules ----------------------------------------------------------------------------------------------
 if [ $FORCE = 1 ] || [ ! -f "$JM/jobmod_7868e9b847d1_e6D98.bin" ]; then
@@ -61,16 +63,28 @@ PATCHES=("$ASC/patches-rpcs3/ascension-1.00.yml"); [ -f "$PATCHDIR/patch.yml" ] 
 step "patch table" "$LOGS/prepare-patches.log" "$PY" -I "$TOOLS/rpcs3_patch.py" runtime --elf "$PRISTINE" --table "$TABLE" --sites "$SITES" --out "$ALLON" --patches "${PATCHES[@]}"
 
 # ---- 3. the PPU code -> src/recomp, then the post-lift hooks -----------------------------------------------------------------
-if [ $FORCE = 1 ] || [ ! -f "$RECOMP/ppu_recomp.h" ]; then
+# Built in a staging directory and moved into place only after the lifter, all six hooks and the output check succeed (lift_stage.sh).
+# Complete = stamp of the current inputs + every file matching the manifest; ppu_recomp.h existing proves nothing (it is written first).
+hooks() {  # hooks <dir>: 4 of these rewrite the chunks in place, one more reason never to run them on the final tree
+  for t in vram_guard_patch zprepass_patch texstream_patch gamelog_patch; do "$PY" "$TOOLS/$t.py" "$1" || return 1; done
+  "$PY" "$TOOLS/vram_plan_patch.py" apply "$1" || return 1
+  "$PY" -I "$TOOLS/mksrc.py" "$1"
+}
+[ $DRY = 1 ] || stage_recover "$RECOMP"
+if [ -f "$SITES" ]; then
+  PPU_STAMP="runtime:$MD5:$(sha1sum "$SITES" | cut -d' ' -f1):tools:$(sum_of "$KIT/ppu_lifter.py" "$KIT/ppu_disasm.py" "$KIT/elf_parser.py" \
+             "$TOOLS"/{vram_guard_patch,zprepass_patch,texstream_patch,gamelog_patch,vram_plan_patch,mksrc}.py "$META/functions.json" "$META/EBOOT.imports.json")"
+else PPU_STAMP="(not known before step 2 runs)"; fi
+if [ $FORCE = 0 ] && why="$(stage_check "$RECOMP" "$PPU_STAMP")"; then
+  echo "== translate the PPU code: complete for these inputs ($(tr '\n' ' ' < "$RECOMP/.lift-info")), skipped"
+else
+  echo "== PPU code: $([ $FORCE = 1 ] && echo "--force" || echo "$why") -> translate"
+  if [ $DRY = 1 ]; then STG="$(stage_path "$RECOMP")"; else STG="$(stage_begin "$RECOMP")"; fi
   step "translate the PPU code" "$LOGS/prepare-ppu.log" "$PY" "$KIT/ppu_lifter.py" "$PRISTINE" --functions "$META/functions.json" \
-       --hle-stubs "$META/EBOOT.imports.json" --toc 0x81EF60 --code-end 0x62C4CC --chunk-lines 150000 -j "$JOBS" --patch-sites "$SITES" -o "$RECOMP"
-  hooks() {
-    for t in vram_guard_patch zprepass_patch texstream_patch gamelog_patch; do "$PY" "$TOOLS/$t.py" "$RECOMP" || return 1; done
-    "$PY" "$TOOLS/vram_plan_patch.py" apply "$RECOMP" || return 1
-    "$PY" -I "$TOOLS/mksrc.py" "$RECOMP"
-  }
-  step "post-lift hooks" "$LOGS/prepare-hooks.log" hooks
-  [ $DRY = 1 ] || echo "runtime:$(md5sum "$PRISTINE" | cut -d' ' -f1):$(sha1sum "$SITES" | cut -d' ' -f1)" > "$RECOMP/.lifted-from"
+       --hle-stubs "$META/EBOOT.imports.json" --toc 0x81EF60 --code-end 0x62C4CC --chunk-lines 150000 -j "$JOBS" --patch-sites "$SITES" -o "$STG"
+  step "post-lift hooks" "$LOGS/prepare-hooks.log" hooks "$STG"
+  step "check the PPU output" "$LOGS/prepare-ppu-check.log" check_ppu "$STG" "$LOGS/prepare-ppu.log"
+  if [ $DRY = 0 ]; then stage_seal "$STG" "$PPU_STAMP"; stage_promote "$STG" "$RECOMP"; echo "   $(cat "$LOGS/prepare-ppu-check.log")"; fi
 fi
 
 # ---- 4. the SPU programs embedded in the EBOOT -> meta/spu ---------------------------------------------------------------------
@@ -90,15 +104,26 @@ if [ $DRY = 0 ]; then
 fi
 
 # ---- 5. the SPU programs -> src/spu --------------------------------------------------------------------------------------------
-if [ $FORCE = 1 ] || [ ! -f "$SPU/spu_workloads.c" ]; then
-  [ $DRY = 1 ] || mkdir -p "$SPU"
+# Three tools write into one directory; the old gate (spu_workloads.c exists) could not tell a run cut short. Staged like step 3.
+[ $DRY = 1 ] || stage_recover "$SPU"
+if [ $DRY = 0 ]; then
+  SPU_STAMP="spu:$MD5:inputs:$(cd "$META/spu" && find . -name '*.elf' -printf '%P\n' | LC_ALL=C sort | xargs sha1sum | sha1sum | cut -c1-12)$(cd "$JM" && find . -type f -printf '%P\n' | LC_ALL=C sort | xargs sha1sum | sha1sum | cut -c1-12):tools:$(sum_of \
+             "$KIT"/{lift_jobmods,lift_spu_pic,build_spu_workloads,wrap_spu_elf,spu_program_pipeline,spu_lifter,spu_disasm,spu_elf}.py "$TOOLS/jobmods_extra_funcs.json" "$TOOLS/job_fragments.json")"
+else SPU_STAMP="(not known before step 4 runs)"; fi
+if [ $FORCE = 0 ] && why="$(stage_check "$SPU" "$SPU_STAMP")"; then
+  echo "== translate the SPU code: complete for these inputs, skipped"
+else
+  echo "== SPU code: $([ $FORCE = 1 ] && echo "--force" || echo "$why") -> translate"
+  if [ $DRY = 1 ]; then STG="$(stage_path "$SPU")"; else STG="$(stage_begin "$SPU")"; fi
   export SPU_LIFT_XREGS=1
-  LIFT_JOBMODS_MERGE=1 step "translate the SPU job modules" "$LOGS/prepare-spu-jobmods.log" "$PY" "$KIT/lift_jobmods.py" --jobmods "$JM" --out "$SPU" \
-       --register "$SPU/jobmods_register.c" --symbol-prefix ascension --extra-funcs-json "$TOOLS/jobmods_extra_funcs.json"
+  LIFT_JOBMODS_MERGE=1 step "translate the SPU job modules" "$LOGS/prepare-spu-jobmods.log" "$PY" "$KIT/lift_jobmods.py" --jobmods "$JM" --out "$STG" \
+       --register "$STG/jobmods_register.c" --symbol-prefix ascension --extra-funcs-json "$TOOLS/jobmods_extra_funcs.json"
   step "translate the SPU code fragments" "$LOGS/prepare-spu-fragments.log" "$PY" "$KIT/lift_spu_pic.py" --elf "$PRISTINE" --fragments "$TOOLS/job_fragments.json" \
-       --out "$SPU" --register "$SPU/pic_register.c" --symbol-prefix ascension
-  step "translate the SPU programs" "$LOGS/prepare-spu-images.log" "$PY" "$KIT/build_spu_workloads.py" --images "$META/spu" --lifted "$SPU" \
-       --out "$SPU/spu_workloads.c" --register-fn ascension_spu_register_all --constructor --title ascension --relift \
+       --out "$STG" --register "$STG/pic_register.c" --symbol-prefix ascension
+  step "translate the SPU programs" "$LOGS/prepare-spu-images.log" "$PY" "$KIT/build_spu_workloads.py" --images "$META/spu" --lifted "$STG" \
+       --out "$STG/spu_workloads.c" --register-fn ascension_spu_register_all --constructor --title ascension --relift \
        --extra-funcs "spu_wws_pm_at_0077CA80=0xA2C,0xA68,0x3368,0x3378"
+  step "check the SPU output" "$LOGS/prepare-spu-check.log" check_spu "$STG"
+  if [ $DRY = 0 ]; then stage_seal "$STG" "$SPU_STAMP"; stage_promote "$STG" "$SPU"; echo "   $(cat "$LOGS/prepare-spu-check.log")"; fi
 fi
 echo "prepared. Next: android/lift/build_lifted.sh"
