@@ -3739,6 +3739,7 @@ static VkStencilOpState vk_gcm_stencil_face(u32 func, u32 fail, u32 zfail, u32 z
     return s;
 }
 
+static u64 s_dbg_spv_hash;   /* GOWA diagnostic: hash of the SPIR-V last handed to vkCreateShaderModule */
 static int vk_eng_translate(const char* hlsl, int stage, VkShaderModule* out)
 {
     u32 words = 0;
@@ -3746,6 +3747,17 @@ static int vk_eng_translate(const char* hlsl, int stage, VkShaderModule* out)
         VK_LOG("engine: %s translation failed: %s\n",
                stage == RSX_SHADER_STAGE_VERTEX ? "vertex" : "fragment", s_g.log);
         return -1;
+    }
+    {   /* diagnostic: FNV-1a of exactly the words given to vkCreateShaderModule; PS3RECOMP_VK_SPV_DUMP=<dir> also writes them */
+        u64 h = 1469598103934665603ull; const u8* b = (const u8*)s_g.spv;
+        for (size_t i = 0; i < (size_t)words * 4u; i++) { h ^= b[i]; h *= 1099511628211ull; }
+        s_dbg_spv_hash = h;
+        const char* dir = getenv("PS3RECOMP_VK_SPV_DUMP");
+        VK_LOG("engine: spv %s %u words hash %016llx\n", stage == RSX_SHADER_STAGE_VERTEX ? "vs" : "fs", words, (unsigned long long)h);
+        if (dir && *dir) {
+            char path[1024]; snprintf(path, sizeof path, "%s/%s_%016llx.spv", dir, stage == RSX_SHADER_STAGE_VERTEX ? "vs" : "fs", (unsigned long long)h);
+            FILE* f = fopen(path, "wb"); if (f) { fwrite(s_g.spv, 4, words, f); fclose(f); }
+        }
     }
     VkShaderModuleCreateInfo ci = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                                     .codeSize = (size_t)words * 4u, .pCode = s_g.spv };
@@ -3835,9 +3847,11 @@ static u32 vk_eng_pipeline_create(void* user, const char* vs_hlsl, const char* p
     vk_eng_pipe* P = &s_epipe[slot];
     memset(P, 0, sizeof *P);
     if (vk_eng_translate(vs_hlsl, RSX_SHADER_STAGE_VERTEX, &P->vs)) return 0;
+    const u64 dbg_vs = s_dbg_spv_hash;
     if (vk_eng_translate(ps_hlsl, RSX_SHADER_STAGE_FRAGMENT, &P->fs)) {
         pvkDestroyShaderModule(s_vk.device, P->vs, NULL); memset(P, 0, sizeof *P); return 0;
     }
+    VK_LOG("engine: pipeline slot %u = vs %016llx + fs %016llx\n", slot + 1u, (unsigned long long)dbg_vs, (unsigned long long)s_dbg_spv_hash);
     P->rs = *rs;
     P->nslots = layout->count;
     P->stride = vertex_stride;
