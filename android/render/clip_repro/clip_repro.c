@@ -21,6 +21,24 @@ static const uint32_t spv_clip4all[] =
 static const uint32_t spv_clip4rsx[] = 
 #include "clip4rsx.vert.inc"
 ;
+static const uint32_t spv_hlslmin[]  =
+#include "hlsl_min.vert.inc"
+;
+static const uint32_t spv_hlslrsx[]  =
+#include "hlsl_rsx.vert.inc"
+;
+static const uint32_t spv_asm_block[]     = 
+#include "asm_block.inc"
+;
+static const uint32_t spv_asm_clipsolo[]  = 
+#include "asm_clip_solo.inc"
+;
+static const uint32_t spv_asm_possolo[]   = 
+#include "asm_pos_solo.inc"
+;
+static const uint32_t spv_asm_bothsolo[]  = 
+#include "asm_both_solo.inc"
+;
 static const uint32_t spv_frag[]     = 
 #include "solid.frag.inc"
 ;
@@ -110,7 +128,13 @@ static int clip_main(void)
     VkShaderModule fsm; { VkShaderModuleCreateInfo s = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = sizeof spv_frag, .pCode = spv_frag }; CK(vkCreateShaderModule(dev, &s, NULL, &fsm)); }
 
     const VsVariant vs[] = { { "clip1 (float[1])", spv_clip1, sizeof spv_clip1 }, { "clip4all (float[4], all = d)", spv_clip4all, sizeof spv_clip4all },
-                             { "clip4rsx (float[4] = 0.5,d,0.5,0.5)", spv_clip4rsx, sizeof spv_clip4rsx } };
+                             { "clip4rsx (float[4] = 0.5,d,0.5,0.5)", spv_clip4rsx, sizeof spv_clip4rsx },
+                             { "HLSL minimal (pos + float4 SV_ClipDistance0)", spv_hlslmin, sizeof spv_hlslmin },
+                             { "HLSL rsx-shaped output struct (14 varyings + clipd0)", spv_hlslrsx, sizeof spv_hlslrsx },
+                             { "asm block: Position+ClipDistance in a Block", spv_asm_block, sizeof spv_asm_block },
+                             { "asm clip_solo: Position in Block, ClipDistance standalone", spv_asm_clipsolo, sizeof spv_asm_clipsolo },
+                             { "asm pos_solo: ClipDistance in Block, Position standalone", spv_asm_possolo, sizeof spv_asm_possolo },
+                             { "asm both_solo: both standalone, direct stores", spv_asm_bothsolo, sizeof spv_asm_bothsolo } };
     /* d[0..3]: distance at the vertices (-1,-1) (1,-1) (-1,1) (1,1) */
     const Case cases[] = {
         { "A all +1.0",             { 1, 1, 1, 1 },     0.0f, 1 },

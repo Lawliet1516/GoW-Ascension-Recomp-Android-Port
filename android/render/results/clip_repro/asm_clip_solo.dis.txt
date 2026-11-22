@@ -1,0 +1,61 @@
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 41
+; Schema: 0
+               OpCapability Shader
+               OpCapability ClipDistance
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %2 "main" %3 %gl_ClipDistance %5 %6
+               OpMemberDecorate %_struct_7 0 BuiltIn Position
+               OpDecorate %_struct_7 Block
+               OpDecorate %gl_ClipDistance BuiltIn ClipDistance
+               OpDecorate %5 Location 0
+               OpDecorate %6 Location 1
+       %void = OpTypeVoid
+          %9 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v2float = OpTypeVector %float 2
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+     %uint_4 = OpConstant %uint 4
+%_arr_float_uint_4 = OpTypeArray %float %uint_4
+  %_struct_7 = OpTypeStruct %v4float
+%_ptr_Output__struct_7 = OpTypePointer Output %_struct_7
+          %3 = OpVariable %_ptr_Output__struct_7 Output
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%_ptr_Output__arr_float_uint_4 = OpTypePointer Output %_arr_float_uint_4
+%_ptr_Output_float = OpTypePointer Output %float
+%gl_ClipDistance = OpVariable %_ptr_Output__arr_float_uint_4 Output
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+%_ptr_Input_float = OpTypePointer Input %float
+          %5 = OpVariable %_ptr_Input_v2float Input
+          %6 = OpVariable %_ptr_Input_float Input
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+      %int_3 = OpConstant %int 3
+    %float_0 = OpConstant %float 0
+    %float_1 = OpConstant %float 1
+  %float_0_5 = OpConstant %float 0.5
+          %2 = OpFunction %void None %9
+         %30 = OpLabel
+         %31 = OpLoad %v2float %5
+         %32 = OpCompositeExtract %float %31 0
+         %33 = OpCompositeExtract %float %31 1
+         %34 = OpCompositeConstruct %v4float %32 %33 %float_0 %float_1
+         %35 = OpLoad %float %6
+         %36 = OpAccessChain %_ptr_Output_v4float %3 %int_0
+               OpStore %36 %34
+         %37 = OpAccessChain %_ptr_Output_float %gl_ClipDistance %int_0
+               OpStore %37 %float_0_5
+         %38 = OpAccessChain %_ptr_Output_float %gl_ClipDistance %int_1
+               OpStore %38 %35
+         %39 = OpAccessChain %_ptr_Output_float %gl_ClipDistance %int_2
+               OpStore %39 %float_0_5
+         %40 = OpAccessChain %_ptr_Output_float %gl_ClipDistance %int_3
+               OpStore %40 %float_0_5
+               OpReturn
+               OpFunctionEnd

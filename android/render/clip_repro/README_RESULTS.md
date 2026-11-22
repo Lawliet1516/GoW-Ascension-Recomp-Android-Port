@@ -8,7 +8,7 @@ Three vertex-shader variants x four cases:
 - variants: `clip1` (`float gl_ClipDistance[1]`), `clip4all` (`[4]`, all equal), `clip4rsx` (`[4]` = 0.5, d, 0.5, 0.5: the shape the RSX decompiler emits);
 - cases: **A** all distances +1 (everything drawn), **B** all -1 (nothing drawn), **C** d = -x (left half drawn, edge at column 32), **control** quad outside NDC (nothing drawn: proves the harness can see "no triangle").
 
-## Result: 12/12 pass in both runs
+## Result of the first repro (GLSL only): 12/12 pass in both runs
 
 | evidence | where |
 |---|---|
@@ -22,7 +22,7 @@ Three vertex-shader variants x four cases:
 Per the brief, "0 validation messages" is **not** used as evidence that rendering is right: the evidence is the pixels. The layer was shown to report in the previous step
 (positive control, `r1_results.md`).
 
-## Interpretation
+## Interpretation (first repro, superseded by the section "Root cause" below where it differs)
 
 **The Adreno 710 driver (Vulkan 1.1.128, driverVersion 0x80267063) clips correctly with `gl_ClipDistance`**, including the all-negative case and the exact shape the RSX decompiler emits.
 The statement in `r1_results.md` that "the driver ignores ClipDistance" was **wrong** and is withdrawn: it was inferred from the scene result without an independent control.
@@ -32,3 +32,48 @@ The `varying + discard` fallback is **not justified by this evidence** and is no
 ## Limits
 - One device, one driver build. 64x64, 1 sample, no depth, one primitive type (strip). Not tested here: MSAA, depth test, multiple planes with different values, interpolation at edges of a non-axis-aligned plane.
 - The repro uses SPIR-V 1.0 from glslang (GLSL); the renderer's SPIR-V comes from glslang HLSL, which can differ (see the next step).
+
+---
+
+# Root cause: `ClipDistance` declared as a standalone output variable (22/11/2026, second round)
+
+## 1. SPIR-V of the renderer versus the repro that works
+The renderer's vertex SPIR-V for `--clip` was captured **as handed to `vkCreateShaderModule`** (`PS3RECOMP_VK_SPV_DUMP`, commit 11d3134): 1903 words, hash `095007ee8a1baa92`, and the log says
+`pipeline slot 1 = vs 095007ee8a1baa92 + fs d2120ca2acddd762`, so **the module in the pipeline of the scene is the one inspected** (it is also byte-identical to the earlier host-side `clip_vs.spv`).
+Disassembly: `results/clip_repro/renderer_scene_clip_vs.dis.txt` (renderer, glslang 11 HLSL front end) versus `clip4rsx.vert.dis.txt` (GLSL repro that clips correctly).
+
+| aspect | repro GLSL (works) | renderer HLSL (fails) | semantic impact |
+|---|---|---|---|
+| `OpCapability ClipDistance` | yes | yes | none |
+| array type | `float[4]` | `float[4]` | none |
+| where `BuiltIn ClipDistance` is attached | `OpMemberDecorate %gl_PerVertex 1` (member of a `Block` struct) | `OpDecorate %_entryPointOutput_clipd0 BuiltIn ClipDistance` (the variable itself) | **tested below: this is the cause** |
+| `BuiltIn Position` | member of the same Block | standalone variable | tested below: no impact |
+| stores | `OpAccessChain %_ %int_1 %int_k` | `OpAccessChain %_entryPointOutput_clipd0 %int_k` via a function-local temp | tested below: no impact |
+| values written | (0.5, d, 0.5, 0.5) | same (`float4(0.5, -(o[5].z), 0.5, 0.5)` in the scene) | none |
+
+## 2. Controlled isolation (same logic, only the declaration form changes)
+Hand-assembled SPIR-V (`tools/gen_spvasm.py`, `spirv-as`, all `spirv-val --target-env vulkan1.0` valid) plus an HLSL shader compiled by the HLSL front end without any RSX code
+(`shaders/hlsl_min.vs.hlsl`, `hlsl_rsx.vs.hlsl`: the same 14-varying output struct and a trailing `float4 SV_ClipDistance0`). 9 variants x 4 cases = 36 cases, same pattern in the executable and in the APK with the layer:
+
+| variant | A all +1 | B all -1 | C d=-x | control |
+|---|---|---|---|---|
+| GLSL `clip1`, `clip4all`, `clip4rsx` (Block) | pass | pass | pass | pass |
+| asm `block` (Position + ClipDistance in one Block) | pass | pass | pass | pass |
+| asm `pos_solo` (ClipDistance in a Block, Position standalone) | pass | pass | pass | pass |
+| asm `clip_solo` (Position in a Block, **ClipDistance standalone**) | pass | **FAIL** (all 4096 px drawn) | **FAIL** | pass |
+| asm `both_solo` (both standalone, direct stores) | pass | **FAIL** | **FAIL** | pass |
+| HLSL minimal / HLSL rsx-shaped (both standalone, from the HLSL front end) | pass | **FAIL** | **FAIL** | pass |
+
+**Cause (reproducible, 28/36 pass, 8 fail, all 8 with the same single property):** on the Adreno 710 (Vulkan 1.1.128, driverVersion 0x80267063, Android 16) a vertex shader whose
+`ClipDistance` output is a *standalone* `Output` variable decorated `BuiltIn ClipDistance` is **not clipped** (the distances are ignored); the identical shader with `ClipDistance`
+as a member of a `gl_PerVertex`-style `Block` clips correctly. The form of `Position`, and the way the stores are written, make no difference.
+
+What is established and what is not:
+- Established: the pass/fail split follows exactly that declaration form, in 36 controlled cases, on this device and driver build, with and without the validation layer.
+- The failing modules are accepted by `spirv-val --target-env vulkan1.0` and produce no validation message; this is not used as proof of anything (the evidence is the pixels).
+- Not established: whether other Adreno drivers behave the same, and whether the Vulkan specification requires the Block form (the standalone form is valid SPIR-V and is what glslang's HLSL front end emits;
+  the spec text was not re-read for this report). Calling it a driver defect is therefore a reading of the evidence, not a ruling.
+
+## 3. Consequence for the fix
+The `varying + discard` fallback is **not needed**: the driver does clip, provided the module declares `ClipDistance` inside a `Block`. The fix is on the SPIR-V that the renderer produces
+(rewrite the standalone `ClipDistance` variable into a Block member), which preserves the clipping semantics exactly (still hardware clipping, no extra fragment work, no interpolation differences).
