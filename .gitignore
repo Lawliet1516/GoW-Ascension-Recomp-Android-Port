@@ -9,3 +9,5 @@ android/bench/out/
 android/**/out/
 build-android-fastfp/
 ps3kit/scratch/
+# android/lift/build_lifted.sh and selftest.sh build here: objects and libraries made from YOUR lifted game code.
+/build-lifted*/
