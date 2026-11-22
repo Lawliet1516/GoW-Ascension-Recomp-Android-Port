@@ -1,3 +1,31 @@
+# Safety net, so a careless `git add -A` cannot publish these (nothing like them is tracked today).
+# Game files and anything derived from them (the nested ascension/.gitignore also covers src/, meta/spu/, build/):
+EBOOT.ELF
+EBOOT.BIN
+EBOOT.SELF
+eboot.elf
+eboot.bin
+*.iso
+*.pkg
+# Backups and archives made by hand (git bundles, tarballs, editor leftovers):
+*.bundle
+*.tar.gz
+*.7z
+*.rar
+*.bak
+*.swp
+*~
+# Credentials and local settings:
+.env
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+credentials*.json
+# Android build outputs (the scene-runner APK is built outside the tree):
+*.apk
+*.aab
+
 # Your disc, your decrypted EBOOT.ELF and everything made from them.
 /work/
 # Build trees.
