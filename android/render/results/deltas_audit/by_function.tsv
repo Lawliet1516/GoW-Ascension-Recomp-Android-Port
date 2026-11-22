@@ -1,0 +1,91 @@
+file	nearest_function(git context, approximate)	added	removed	significant	present_verbatim
+cellGcmSys.c	cellGcm_ref_on_poll	822	7	618	5
+cellGcmSys.c	gcm_rsx_process_fifo_unlocked	453	20	386	7
+cellGcmSys.c	gcm_forget_spu_blocks	203	0	148	1
+cellGcmSys.c	ps3_qpc_us	153	0	119	3
+cellGcmSys.c	gcm_spu_block_for_put	86	0	66	2
+cellGcmSys.c	cellGcmAddressToOffset	63	11	47	0
+cellGcmSys.c	nv3089_blit	55	2	44	0
+cellGcmSys.c	_cellGcmSetFlipCommand	39	1	33	5
+cellGcmSys.c	static u32 s_tr_i = 0;	38	0	28	0
+cellGcmSys.c	cellGcmInit	29	0	26	2
+cellGcmSys.c	gcm_note_spu_put	24	0	17	0
+cellGcmSys.c	nv3089_engine_wrote	23	0	16	0
+cellGcmSys.c	populate_offset_table	22	0	18	0
+cellGcmSys.c	ppu_gcm_pump	18	2	17	1
+cellGcmSys.c	static int s_gcm_syscall_mode = 0;	17	0	13	5
+cellGcmSys.c	cellGcmSetDefaultFifoSize	17	0	14	0
+cellGcmSys.c	_cellGcmSetFlipCommandWithWaitLabel	16	1	15	4
+cellGcmSys.c	static volatile int s_flip_pending = 0;	15	0	11	0
+cellGcmSys.c	static u32 s_fifo_getoff;   /* tentative	13	0	10	0
+cellGcmSys.c	offset	13	0	10	1
+cellGcmSys.c	gcm_ref_publish_one	12	1	9	1
+cellGcmSys.c	gcm_flip_into_fifo	9	3	9	0
+cellGcmSys.c	gcm_fifo_resync_why	7	2	6	0
+cellGcmSys.c	cellGcmMapMainMemory	6	2	3	0
+cellGcmSys.c	static u16 s_ea_address_table[65536];	7	0	7	0
+cellGcmSys.c	cellGcm_fifo_kick_wait	7	0	4	0
+cellGcmSys.c	cellGcm_rsx_process_fifo	7	0	7	0
+cellGcmSys.c	cellGcmUnmapEaIoAddress	5	1	0	0
+cellGcmSys.c	cellGcmUnmapIoAddress	5	1	0	0
+cellGcmSys.c	cellGcm_syscall_iounmap	6	0	4	0
+cellGcmSys.c	gcm_ref_push_at	3	2	2	0
+cellGcmSys.c	cellGcmGetLabelAddress	5	0	5	0
+cellGcmSys.c	gcm_2d_method	3	1	2	0
+cellGcmSys.c	cellGcmGetOffsetTable	3	1	3	0
+cellGcmSys.c	cellGcmMapEaIoAddress	4	0	0	0
+cellGcmSys.c	gcm_flip_request	3	0	3	0
+cellGcmSys.c	ydkj_restore_handler_opd	1	1	1	0
+cellGcmSys.c	cellGcmGetTiledPitchSize	1	1	1	0
+cellGcmSys.c	cellGcm_syscall_iomap	2	0	0	0
+cellGcmSys.c	static u32 s_gcm_context_ea = 0;	1	0	0	0
+cellGcmSys.c	clear_offset_table	1	0	1	0
+cellGcmSys.c	gcm_fifo_dump_around	1	0	1	0
+cellGcmSys.c	cellGcmSetPrepareFlip	1	0	1	0
+rsx_commands.c	rsx_process_method	24	55	21	0
+rsx_commands.c	process_vertex_attrib_method	54	0	40	31
+rsx_dispatch.c	rsx_dispatch_method	271	31	176	30
+rsx_dispatch.c	rsx_dispatch_seed_transform_constants	128	0	110	0
+rsx_dispatch.c	vtx_const_fold	4	1	3	2
+rsx_dispatch.c	rsx_dispatch_init	2	0	2	0
+rsx_dispatch.c	rsx_dispatch_seed_registers	2	0	2	0
+rsx_dispatch.c	rsx_dispatch_seed_transform_program	2	0	2	0
+rsx_dispatch.c	vtx_const_set	1	0	1	0
+rsx_dispatch.h	rsx_dispatch_method	41	0	40	0
+rsx_draw_engine.c	static const char* const kEngFixedVS =	2	0	2	2
+rsx_fp_decompiler.c	rsx_fp_decompile_buffered_color_ex	439	0	324	13
+rsx_fp_decompiler.c	rsx_fp_decompile_internal	143	24	115	6
+rsx_fp_decompiler.c	input_expr	102	2	66	0
+rsx_fp_decompiler.c	rsx_fp_structural_hash	96	0	59	6
+rsx_fp_decompiler.c	static const u32 fp_export_reg[2][FP_MAX	82	0	56	0
+rsx_fp_decompiler.c	emit_src	43	7	32	1
+rsx_fp_decompiler.c	rsx_fp_collect_constants	37	0	21	14
+rsx_fp_decompiler.c	rsx_fp_apply_srgb_output	35	0	27	13
+rsx_fp_decompiler.c	fp_gamma_helper	29	0	24	0
+rsx_fp_decompiler.c	rsx_fp_shadow_desc_from_texture	22	0	14	10
+rsx_fp_decompiler.c	fp_hash_bytes	14	4	9	0
+rsx_fp_decompiler.c	rsx_fp_extract_consts	1	1	1	0
+rsx_fp_decompiler.c	(file scope)	1	0	1	0
+rsx_fp_decompiler.h	rsx_fp_structural_hash	28	0	24	0
+rsx_fp_decompiler.h	rsx_fp_program_size	20	0	18	0
+rsx_fp_decompiler.h	rsx_fp_apply_srgb_output	6	0	5	0
+rsx_fp_decompiler.h	rsx_fp_collect_constants	4	0	4	1
+rsx_vertex_compact.c	rsx_vertex_fetch_one	780	28	535	32
+rsx_vertex_compact.c	(file scope)	256	0	149	0
+rsx_vertex_compact.c	rsx_vertex_fetch_plan_prepare	65	7	47	30
+rsx_vertex_compact.c	rsx_vertex_remap_build	55	7	35	3
+rsx_vertex_compact.c	rsx_vertex_decode_element	19	0	12	0
+rsx_vertex_compact.c	rsx_vertex_remap_destroy	2	0	2	0
+rsx_vertex_compact.c	rsx_vertex_topology_plan	2	0	2	0
+rsx_vertex_compact.h	rsx_vertex_fetch_one	33	0	26	1
+rsx_vertex_compact.h	rsx_vertex_remap_build	18	2	14	0
+rsx_vertex_compact.h	typedef struct rsx_vertex_layout_plan {	10	0	9	0
+rsx_vertex_compact.h	typedef struct rsx_vertex_remap {	6	0	2	0
+rsx_vp_decompiler.c	rsx_vp_decompile_impl	205	7	154	7
+rsx_vp_decompiler.c	rsx_vp_decompile_compact_ex	51	1	36	6
+rsx_vp_decompiler.c	(file scope)	16	0	10	0
+rsx_vp_decompiler.c	rsx_vp_decompile_ex	1	1	1	0
+rsx_vp_decompiler.h	rsx_vp_decompile_compact_ex	9	0	8	1
+rsx_vp_decompiler.h	rsx_vp_sca_name	5	0	4	0
+rsx_vulkan_backend.c	(file scope)	4	0	1	0
+rsx_vulkan_backend.c	rsx_vulkan_backend_pump_messages	1	1	1	0

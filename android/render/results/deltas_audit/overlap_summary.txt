@@ -1,0 +1,14 @@
+file                      added  removed  hunks  significant  present_verbatim  pct
+cellGcmSys.c               2219       60    137         1725                37    2%
+rsx_commands.c               78       55     10           61                31   50%
+rsx_dispatch.c              410       32     14          296                32   10%
+rsx_dispatch.h               41        0      1           40                 0    0%
+rsx_draw_engine.c             2        0      2            2                 2  100%
+rsx_fp_decompiler.c        1044       38     51          749                63    8%
+rsx_fp_decompiler.h          58        0      4           51                 1    1%
+rsx_vertex_compact.c       1179       42     14          782                65    8%
+rsx_vertex_compact.h         67        2      4           51                 1    1%
+rsx_vp_decompiler.c         273        9     16          201                13    6%
+rsx_vp_decompiler.h          14        0      2           12                 1    8%
+rsx_vulkan_backend.c          5        1      3            2                 0    0%
+TOTAL                      5390      239    258         3972               246    6%
