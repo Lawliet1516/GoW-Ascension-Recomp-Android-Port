@@ -14,7 +14,7 @@ public class MainActivity extends Activity {
       int rc = -1;
       try {
         if (env != null) for (String kv : env.split(",")) { int e = kv.indexOf('='); if (e > 0) Runner.setenv(kv.substring(0, e), kv.substring(e + 1)); }
-        rc = Runner.run(new File(dir, tag + ".log").getPath(), a);
+        rc = a.equals("repro") ? Repro.run(new File(dir, tag + ".log").getPath()) : Runner.run(new File(dir, tag + ".log").getPath(), a);
       } catch (Throwable t) { rc = -2; }
       try (FileWriter w = new FileWriter(new File(dir, tag + ".rc"))) { w.write(Integer.toString(rc)); } catch (Exception e) {}
       runOnUiThread(new Runnable() { public void run() { finish(); } });

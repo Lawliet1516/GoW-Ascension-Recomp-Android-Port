@@ -1,3 +1,6 @@
+> **CORRECTION (22/11/2026):** the "`--clip`: what is established" section below concluded that the driver ignores `ClipDistance`. An independent repro (`clip_repro/README_RESULTS.md`) shows the
+> driver clips correctly (12/12), so that conclusion is **withdrawn**; the cause is in the integration and is still open.
+
 # R1: the 30 scene runs inside the APK with the Khronos validation layer (22/11/2026)
 
 Adreno (TM) 710, Vulkan 1.1.128, `libVkLayer_khronos_validation.so` 1.4.363.1 (arm64), runner = `render/host` built as `libgowa_scenes.so`
@@ -53,5 +56,5 @@ Driver script: `r1_scenes_apk.sh` (resets `debug.vulkan.layers` on exit). Layer 
 - The vertex SPIR-V is valid, `ClipDistance` is `float[4]` Output with `BuiltIn ClipDistance`, the feature `shaderClipDistance` is enabled, and the layer says nothing: **the API usage is not the cause**.
 - Experiment (temporary change to `rsx_vp_apply_user_clip`, reverted, not committed): with every distance forced to `-1.0` (`Out.clipd0 = float4(-1,-1,-1,-1)`, confirmed in the dumped HLSL),
   and with a scalar `float clipd0` instead of `float4`, the triangle is still drawn (`0xFFFF0000`, same as R0). A correct implementation must clip everything in that case.
-- Conclusion: **the Adreno 710 driver (Vulkan 1.1.128) ignores `ClipDistance`** for this pipeline. This is strong evidence, not a proof about the driver internals (no minimal standalone repro was made).
-- Next: the portable workaround (distances as a varying, `discard` in the fragment shader), written in the decompilers, tested with `--clip` and `--clip-keep`; and check whether Ascension uses user clip planes at all.
+- ~~Conclusion: the Adreno 710 driver ignores `ClipDistance`~~ **withdrawn**: see the correction at the top. What remains true: the scene draws the triangle even with all distances forced to -1.
+- Next: find why the renderer's pipeline does not clip although the driver can (SPIR-V/pipeline-state/scene differences versus `clip_repro`). The fallback is on hold.

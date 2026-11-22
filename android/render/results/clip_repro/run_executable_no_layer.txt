@@ -1,0 +1,33 @@
+EVIDENCE device: Adreno (TM) 710 | vendorID 0x5143 deviceID 0x07010000 | apiVersion 1.1.128 | driverVersion 0x80267063 (2150002787)
+EVIDENCE VkPhysicalDeviceFeatures.shaderClipDistance = 1, shaderCullDistance = 1
+EVIDENCE limits.maxClipDistances = 8, maxCullDistances = 8, maxCombinedClipAndCullDistances = 8
+EVIDENCE VkDeviceCreateInfo.pEnabledFeatures->shaderClipDistance = 1 (the exact struct passed to vkCreateDevice)
+VARIANT clip1 (float[1])
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT clip4all (float[4], all = d)
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT clip4rsx (float[4] = 0.5,d,0.5,0.5)
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+SUMMARY 12/12 cases pass, 0 fail
+EXIT=0
