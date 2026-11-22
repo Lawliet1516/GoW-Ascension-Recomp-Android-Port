@@ -1,0 +1,30 @@
+fork-lifter-preamble     tools/test_ppu_directory.py                      ppu_recomp.h:366:26: error: conflicting declaration of ‘void vm_write32_inl(uint64_t, uint32_t)’ with ‘C’ linkage
+fork-lifter-preamble     tools/test_ppu_lift.py                           scratch/ppu_conformance.cpp:241:36: error: expected initializer before ‘vm_base’
+fork-mpnet-symbols       tools/test_sys_net.py                            test_sys_net.c:(.text+0x396): undefined reference to `mpnet_on'
+fork-new-runtime-symbols tests/test_spu_fnms_zero_extended.py             spu_interp.c:(.text+0x1a144): undefined reference to `spu_lifted_probe'
+fork-new-runtime-symbols tools/test_socket_sigpipe.py                     test_socket_sigpipe.c:(.text.vm_write8+0x58): undefined reference to `spu_lockline_lock_range'
+fork-new-runtime-symbols tools/test_spu_interpreter_ilh.py                spu_interp.c:(.text+0x7e7f): undefined reference to `spu_lifted_probe'
+MSVC-only-code           tools/test_gcm_map_flags.py                      tests/../libs/video/cellGcmSys.c:1535:19: error: unknown type name ‘align’
+MSVC-only-code           tools/test_sail_boot_callback.py                 runtime/ppu/ppu_hle.cpp:800:49: error: ‘SRWLOCK’ does not name a type
+MSVC-only-code           tools/test_spu_context_registries.py             runtime/spu/spurs_policy.c:41:19: error: unknown type name ‘align’
+MSVC-only-code           tools/test_spu_interpreter_handoff.py            runtime/spu/spurs_policy.c:41:19: error: unknown type name ‘align’
+MSVC-only-code           tools/test_spu_machine_status.py                 runtime/spu/spurs_policy.c:41:19: error: unknown type name ‘align’
+MSVC-only-code           tools/test_spurs_scheduler.py                    runtime/spu/spurs_policy.c:41:19: error: unknown type name ‘align’
+MSVC-only-code           tools/test_spu_sdcrz.py                          runtime/spu/spurs_policy.c:41:19: error: unknown type name ‘align’
+MSVC-only-code           tools/test_sysmodule_unload_module_ex.py         runtime/ppu/ppu_hle.cpp:800:49: error: ‘SRWLOCK’ does not name a type
+OTHER                    tools/test_edat_guest_klicensee.py               FAIL: fixture did not build
+OTHER                    tools/test_http_response_getters.py              FAIL: fixture did not build
+OTHER                    tools/test_http_uri_path.py                      FAIL: fixture did not build
+OTHER                    tools/test_live_draw_sampler_key.py              Traceback (most recent call last):
+OTHER                    tools/test_lwcond_layout.py                      t.cpp:50:14: error: ‘c’ was not declared in this scope
+OTHER                    tools/test_mfc_resume_elements.py                ERROR: setUpClass (__main__.ResumeElementsTests)
+OTHER                    tools/test_np_basic_after_np_init.py             FAIL: fixture did not build
+OTHER                    tools/test_ppu_dispatch_depth.py                 runtime/ppu/ppu_loader.cpp:787:22: error: expected constructor, destructor, or type conversion before ‘(’ token
+OTHER                    tools/test_ppu_entry_arguments.py                runtime/ppu/ppu_loader.cpp:787:22: error: expected constructor, destructor, or type conversion before ‘(’ token
+OTHER                    tools/test_ppu_fs_imports.py                     FAIL: fixture did not build
+OTHER                    tools/test_ppu_fs_large_file.py                  FAIL: fixture did not build
+OTHER                    tools/test_savedata_user_autosave.py             FAIL: fixture did not build
+OTHER                    tools/test_spu_program_pipeline.py               FAIL: test_compiled_runtime_registration_and_cmake (__main__.Pipeline.test_compiled_runtime_registration_and_cmake)
+OTHER                    tools/test_spurs_taskset_size.py                 fixture.c:(.text.spurs_create_taskset+0x99): undefined reference to `spu_taskset_track'
+OTHER                    tools/test_spu_smc_lqa_stqa.py                   smc_lqa_stqa.c:(.text+0x68c): undefined reference to `spu_smc_ret_lr_on'
+OTHER                    tools/test_spu_taskset_elf_flags.py              test.c:(.text+0x390): undefined reference to `ts_start_ready'

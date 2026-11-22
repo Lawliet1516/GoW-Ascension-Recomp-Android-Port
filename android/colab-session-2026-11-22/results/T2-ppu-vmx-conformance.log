@@ -1,0 +1,43 @@
+=== A. android/lift/selftest.sh as committed (host lifter tests + NDK arm64 build, OUT outside the repo)
+== test_ppu_lifter_chunks
+ok   chunk membership follows addresses only (0 functions moved)
+PASS
+== test_ppu_branches
+ok: blr returns; blrl/bnelrl dispatch via LR and continue; conditional branches fall through
+== test_ppu_jumptables
+ok   multi-TOC: near targets beat more targets far away
+all jump-table vectors passed
+== test_ppu_fallthrough
+ok   function ending in blr has no fall-through
+all fall-through checks passed
+== test_ppu_vmx_lanes
+  10 ops x 300 cases agree with the reference model
+ok test_vmx_big_endian_lanes
+== test_ppu_vcmp_record_cr6
+ok test_vcmp_record_sets_cr6
+ok test_non_record_compare_leaves_cr_alone
+== PPU instruction conformance: generate + cross-compile for arm64
+wrote /root/work/colab-station/snap/dc38f15/ps3kit/scratch/ppu_conformance.cpp: 1202 cases (0 skipped at generation)
+  memory barriers lowered to fences in the driver: 5
+(no adb device: the arm64 binary is /root/work/colab-station/runs/T2-conformance/selftest/ppu_conformance)
+selftest.sh exit=0
+d034f6db05889958b95253176bbb34d9  scratch/ppu_conformance.cpp
+=== B. x86-64 native (validates lifted semantics on the host)
+--- x86_gcc_O1: compiled in 6 s, 193568 bytes
+    ran in 0 s, exit=0, FAIL lines=0
+[ppu-conformance] 1533 checks passed, 0 FAILED, 0 skipped
+--- x86_clang_O1: compiled in 4 s, 144152 bytes
+    ran in 0 s, exit=0, FAIL lines=0
+[ppu-conformance] 1533 checks passed, 0 FAILED, 0 skipped
+--- x86_clang_O2: compiled in 4 s, 119496 bytes
+    ran in 0 s, exit=0, FAIL lines=0
+[ppu-conformance] 1533 checks passed, 0 FAILED, 0 skipped
+=== C. arm64 NDK r29 clang, static (bionic), run under qemu-aarch64 -cpu cortex-a76 (closest qemu model to the A78: ARMv8.2, no SVE)
+--- a64_O1_static: compiled in 3 s, 3953344 bytes
+    ran in 0 s, exit=0, FAIL lines=0
+[ppu-conformance] 1533 checks passed, 0 FAILED, 0 skipped
+--- a64_O2_static: compiled in 5 s, 3926608 bytes
+    ran in 0 s, exit=0, FAIL lines=0
+[ppu-conformance] 1533 checks passed, 0 FAILED, 0 skipped
+=== D. the dynamic binary selftest.sh produced, under qemu (needs Android's linker64: expected not to start)
+/root/work/colab-station/runs/T2-conformance/selftest/ppu_conformance: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /system/bin/linker64, not stripped

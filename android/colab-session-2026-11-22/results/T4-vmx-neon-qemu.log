@@ -1,0 +1,5 @@
+bit-exactness: ok (0 mismatches over 3000000 random/special vectors per op, NJ on and off)
+vmaddfp    neon   4.46 ns/op   scalar   4.28 ns/op   x0.96
+vaddfp     neon   4.94 ns/op   scalar   4.46 ns/op   x0.90
+vrefp      neon  73.04 ns/op   scalar 228.39 ns/op   x3.13
+vcmpgtfp   neon   2.84 ns/op   scalar   2.76 ns/op   x0.97
