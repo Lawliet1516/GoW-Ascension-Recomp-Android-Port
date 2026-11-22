@@ -8,9 +8,12 @@
  *   __ImageBase               PE image base on Windows; the runtime uses its address to compress code pointers.
  *   ld_blit_ab, rsx_live_draw_*  the D3D12 live-draw engine (rsx_live_draw.c is Windows-only: no-ops off Windows).
  *   g_spu_iojrn_rt, t_spu_iojrn  hooks for the Ascension IO-journal on SPUs: absent = disabled.
- *   psnr_*                    community-server online client (libs/network/psnr/psnr.c is in the library; these are the
- *                             transport functions of ascension/host): online play disabled here.
  *   vm_base                   the guest address space base (set by whoever maps guest memory).
+ *
+ * NOT here: psnr_* (the community-server client). Its real implementation, libs/network/psnr/psnr.c (vendored, POSIX and Windows),
+ * is compiled into libps3kit_android.a since the recursive libs/ glob of 4dba99e; ascension/host never defined these. Stubs here
+ * duplicated all 16 (a whole-archive link fails) and, with variadic signatures that do not match psnr.h, could shadow the real client
+ * in an ordinary link. Whether online play runs is decided by np_psnr.c's configuration, not by the link.
  */
 #include <stdint.h>
 #include <stddef.h>
@@ -42,22 +45,3 @@ int rsx_live_draw_w2_packet(uint32_t cls, uint32_t type, uint32_t method, uint32
 const void* g_spu_iojrn_rt = NULL;
 __thread const void* t_spu_iojrn = NULL;
 uint8_t* vm_base = NULL;
-
-/* online: every call fails / reports "no server" */
-typedef struct psnr_client psnr_client;
-psnr_client* psnr_connect(const char* h, uint16_t p, const char* c, const char* o, const void* x) { STUB_ONCE("psnr_connect"); (void)h; (void)p; (void)c; (void)o; (void)x; return NULL; }
-void psnr_close(psnr_client* c) { STUB_ONCE("psnr_close"); (void)c; }
-int  psnr_connect_error(const psnr_client* c) { STUB_ONCE("psnr_connect_error"); (void)c; return -1; }
-int  psnr_send(psnr_client* c, ...) { STUB_ONCE("psnr_send"); (void)c; return -1; }
-int  psnr_poll(psnr_client* c, ...) { STUB_ONCE("psnr_poll"); (void)c; return 0; }
-void psnr_msg_free(void* m) { STUB_ONCE("psnr_msg_free"); (void)m; }
-void psnr_server_addr(const psnr_client* c, uint8_t ip[4], uint16_t* port) { STUB_ONCE("psnr_server_addr"); (void)c; ip[0] = ip[1] = ip[2] = ip[3] = 0; *port = 0; }
-void psnr_probe_packet(const psnr_client* c, uint8_t* out) { STUB_ONCE("psnr_probe_packet"); (void)c; (void)out; }
-void psnr_punch_packet(const psnr_client* c, uint8_t* out) { STUB_ONCE("psnr_punch_packet"); (void)c; (void)out; }
-int  psnr_is_control(const void* b, size_t n) { STUB_ONCE("psnr_is_control"); (void)b; (void)n; return 0; }
-int  psnr_probe_reply(const void* b, size_t n, uint8_t ip[4], uint16_t* port) { STUB_ONCE("psnr_probe_reply"); (void)b; (void)n; (void)ip; (void)port; return 0; }
-int  psnr_relay_available(const psnr_client* c) { STUB_ONCE("psnr_relay_available"); (void)c; return 0; }
-int  psnr_relay_wrap(const psnr_client* c, ...) { STUB_ONCE("psnr_relay_wrap"); (void)c; return -1; }
-int  psnr_relay_unwrap(const psnr_client* c, ...) { STUB_ONCE("psnr_relay_unwrap"); (void)c; return -1; }
-int64_t psnr_stream_connect(const psnr_client* c, ...) { STUB_ONCE("psnr_stream_connect"); (void)c; return -1; }
-int64_t psnr_stream_accept(const psnr_client* c, ...) { STUB_ONCE("psnr_stream_accept"); (void)c; return -1; }
