@@ -47,7 +47,8 @@ if [ ! -f "$PRISTINE" ]; then
   exit 1
 fi
 echo "EBOOT.ELF md5 $(md5sum "$PRISTINE" | cut -d' ' -f1)"
-mkdir -p "$LOGS" "$PATCHDIR" "$META/spu"
+# --dry-run changes nothing: no directory, no file, no temporary is made from here on (step() only prints in that mode)
+[ $DRY = 1 ] || mkdir -p "$LOGS" "$PATCHDIR" "$META/spu"
 
 # ---- 1. the SPU job modules ----------------------------------------------------------------------------------------------
 if [ $FORCE = 1 ] || [ ! -f "$JM/jobmod_7868e9b847d1_e6D98.bin" ]; then
@@ -73,7 +74,7 @@ if [ $FORCE = 1 ] || [ ! -f "$RECOMP/ppu_recomp.h" ]; then
 fi
 
 # ---- 4. the SPU programs embedded in the EBOOT -> meta/spu ---------------------------------------------------------------------
-TMPON="$(mktemp -d)"; TMPORIG="$(mktemp -d)"; trap 'rm -rf "$TMPON" "$TMPORIG"' EXIT
+if [ $DRY = 0 ]; then TMPON="$(mktemp -d)"; TMPORIG="$(mktemp -d)"; trap 'rm -rf "$TMPON" "$TMPORIG"' EXIT; else TMPON="<tmp>"; TMPORIG="<tmp>"; fi
 extract() {
   "$PY" "$KIT/extract_spu_images.py" "$ALLON" -o "$TMPON" || return 1
   "$PY" "$KIT/extract_spu_images.py" "$PRISTINE" -o "$TMPORIG" || return 1
@@ -90,7 +91,7 @@ fi
 
 # ---- 5. the SPU programs -> src/spu --------------------------------------------------------------------------------------------
 if [ $FORCE = 1 ] || [ ! -f "$SPU/spu_workloads.c" ]; then
-  mkdir -p "$SPU"
+  [ $DRY = 1 ] || mkdir -p "$SPU"
   export SPU_LIFT_XREGS=1
   LIFT_JOBMODS_MERGE=1 step "translate the SPU job modules" "$LOGS/prepare-spu-jobmods.log" "$PY" "$KIT/lift_jobmods.py" --jobmods "$JM" --out "$SPU" \
        --register "$SPU/jobmods_register.c" --symbol-prefix ascension --extra-funcs-json "$TOOLS/jobmods_extra_funcs.json"
