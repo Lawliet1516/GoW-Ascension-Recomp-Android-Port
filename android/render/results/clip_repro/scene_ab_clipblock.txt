@@ -1,0 +1,4 @@
+== tclip_fix0: [host] presented pixel: 0xFFFF0000 (expected 0xFF101830) MISMATCH
+== tclip_fix1: [host] presented pixel: 0xFF101830 (expected 0xFF101830) OK
+== tclipkeep_fix0: [host] presented pixel: 0xFFFF0000 (expected 0xFFFF0000) OK
+== tclipkeep_fix1: [host] presented pixel: 0xFFFF0000 (expected 0xFFFF0000) OK

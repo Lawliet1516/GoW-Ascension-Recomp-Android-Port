@@ -83,4 +83,67 @@ VARIANT asm both_solo: both standalone, direct stores
   FAIL  C d=-x (left half kept)      red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected left half drawn, edge near column 32
   WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
   PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
-SUMMARY 28/36 cases pass, 8 fail
+VARIANT asm both_solo_arr: both standalone, whole-array store
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  FAIL  B all -1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  FAIL  C d=-x (left half kept)      red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT HLSL six distances, only plane 5 tested (float[6])
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  FAIL  B all -1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  FAIL  C d=-x (left half kept)      red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT FIXED HLSL six distances (post-pass)
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT FIXED HLSL minimal (rsx_spv_clipblock post-pass)
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT FIXED HLSL rsx-shaped (post-pass)
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT FIXED asm both_solo (post-pass)
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+VARIANT FIXED asm both_solo_arr, whole-array store (post-pass)
+  WRITTEN A all +1.0                   vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,1.0) (-1.0,1.0,1.0) (1.0,1.0,1.0)
+  PASS  A all +1.0                   red 4096/4096 blue    0 other 0 | row 32: first non-red column -1 | expected everything drawn
+  WRITTEN B all -1.0                   vertices (x,y,d): (-1.0,-1.0,-1.0) (1.0,-1.0,-1.0) (-1.0,1.0,-1.0) (1.0,1.0,-1.0)
+  PASS  B all -1.0                   red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+  WRITTEN C d=-x (left half kept)      vertices (x,y,d): (-1.0,-1.0,1.0) (1.0,-1.0,-1.0) (-1.0,1.0,1.0) (1.0,1.0,-1.0)
+  PASS  C d=-x (left half kept)      red 2048/4096 blue 2048 other 0 | row 32: first non-red column 32 | expected left half drawn, edge near column 32
+  WRITTEN control: quad outside NDC    vertices (x,y,d): (3.0,-1.0,1.0) (5.0,-1.0,1.0) (3.0,1.0,1.0) (5.0,1.0,1.0)
+  PASS  control: quad outside NDC    red    0/4096 blue 4096 other 0 | row 32: first non-red column 0 | expected nothing drawn
+SUMMARY 52/64 cases pass, 12 fail

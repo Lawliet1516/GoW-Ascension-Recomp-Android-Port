@@ -1,0 +1,96 @@
+; SPIR-V
+; Version: 1.0
+; Generator: Google Shaderc over Glslang; 10
+; Bound: 121
+; Schema: 0
+               OpCapability Shader
+               OpCapability ClipDistance
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %p %d %_entryPointOutput_pos %_entryPointOutput_clipd1
+               OpSource HLSL 500
+               OpSourceExtension "GL_GOOGLE_cpp_style_line_directive"
+               OpSourceExtension "GL_GOOGLE_include_directive"
+               OpName %main "main"
+               OpName %p "p"
+               OpName %d "d"
+               OpName %_entryPointOutput_pos "@entryPointOutput.pos"
+               OpName %_entryPointOutput_clipd1 "@entryPointOutput.clipd1"
+               OpDecorate %p Location 0
+               OpDecorate %d Location 1
+               OpDecorate %_entryPointOutput_pos BuiltIn Position
+               OpDecorate %_entryPointOutput_clipd1 BuiltIn ClipDistance
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v2float = OpTypeVector %float 2
+%_ptr_Function_v2float = OpTypePointer Function %v2float
+%_ptr_Function_float = OpTypePointer Function %float
+    %v4float = OpTypeVector %float 4
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %float_0 = OpConstant %float 0
+    %float_1 = OpConstant %float 1
+%_ptr_Function_v4float = OpTypePointer Function %v4float
+      %int_1 = OpConstant %int 1
+  %float_0_5 = OpConstant %float 0.5
+         %31 = OpConstantComposite %v4float %float_0_5 %float_0_5 %float_0_5 %float_0_5
+      %int_2 = OpConstant %int 2
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+          %p = OpVariable %_ptr_Input_v2float Input
+%_ptr_Input_float = OpTypePointer Input %float
+          %d = OpVariable %_ptr_Input_float Input
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%_entryPointOutput_pos = OpVariable %_ptr_Output_v4float Output
+       %uint = OpTypeInt 32 0
+     %uint_6 = OpConstant %uint 6
+%_arr_float_uint_6 = OpTypeArray %float %uint_6
+%_ptr_Output__arr_float_uint_6 = OpTypePointer Output %_arr_float_uint_6
+%_entryPointOutput_clipd1 = OpVariable %_ptr_Output__arr_float_uint_6 Output
+     %uint_0 = OpConstant %uint 0
+%_ptr_Output_float = OpTypePointer Output %float
+     %uint_1 = OpConstant %uint 1
+     %uint_2 = OpConstant %uint 2
+      %int_3 = OpConstant %int 3
+     %uint_3 = OpConstant %uint 3
+      %int_4 = OpConstant %int 4
+      %int_5 = OpConstant %int 5
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+        %111 = OpVariable %_ptr_Function_v2float Function
+        %110 = OpVariable %_ptr_Function_v4float Function
+         %43 = OpLoad %v2float %p
+         %47 = OpLoad %float %d
+         %93 = OpCompositeExtract %float %43 0
+         %94 = OpCompositeExtract %float %43 1
+         %95 = OpCompositeConstruct %v4float %93 %94 %float_0 %float_1
+         %99 = OpCompositeConstruct %v2float %float_0_5 %47
+               OpStore %110 %31
+               OpStore %111 %99
+               OpStore %_entryPointOutput_pos %95
+        %115 = OpAccessChain %_ptr_Function_float %110 %uint_0
+         %65 = OpLoad %float %115
+         %67 = OpAccessChain %_ptr_Output_float %_entryPointOutput_clipd1 %int_0
+               OpStore %67 %65
+        %116 = OpAccessChain %_ptr_Function_float %110 %uint_1
+         %70 = OpLoad %float %116
+         %71 = OpAccessChain %_ptr_Output_float %_entryPointOutput_clipd1 %int_1
+               OpStore %71 %70
+        %117 = OpAccessChain %_ptr_Function_float %110 %uint_2
+         %74 = OpLoad %float %117
+         %75 = OpAccessChain %_ptr_Output_float %_entryPointOutput_clipd1 %int_2
+               OpStore %75 %74
+        %118 = OpAccessChain %_ptr_Function_float %110 %uint_3
+         %79 = OpLoad %float %118
+         %80 = OpAccessChain %_ptr_Output_float %_entryPointOutput_clipd1 %int_3
+               OpStore %80 %79
+        %119 = OpAccessChain %_ptr_Function_float %111 %uint_0
+         %83 = OpLoad %float %119
+         %84 = OpAccessChain %_ptr_Output_float %_entryPointOutput_clipd1 %int_4
+               OpStore %84 %83
+        %120 = OpAccessChain %_ptr_Function_float %111 %uint_1
+         %87 = OpLoad %float %120
+         %88 = OpAccessChain %_ptr_Output_float %_entryPointOutput_clipd1 %int_5
+               OpStore %88 %87
+               OpReturn
+               OpFunctionEnd

@@ -54,6 +54,12 @@ static const uint32_t spv_fix_bothsolo[]  =
 static const uint32_t spv_fix_bothsoloarr[] =
 #include "fix_asm_both_solo_arr.inc"
 ;
+static const uint32_t spv_hlslsix[]       =
+#include "hlsl_six.vert.inc"
+;
+static const uint32_t spv_fix_hlslsix[]   =
+#include "fix_hlsl_six.vert.inc"
+;
 static const uint32_t spv_frag[]     = 
 #include "solid.frag.inc"
 ;
@@ -151,6 +157,8 @@ static int clip_main(void)
                              { "asm pos_solo: ClipDistance in Block, Position standalone", spv_asm_possolo, sizeof spv_asm_possolo },
                              { "asm both_solo: both standalone, direct stores", spv_asm_bothsolo, sizeof spv_asm_bothsolo },
                              { "asm both_solo_arr: both standalone, whole-array store", spv_asm_bothsoloarr, sizeof spv_asm_bothsoloarr },
+                             { "HLSL six distances, only plane 5 tested (float[6])", spv_hlslsix, sizeof spv_hlslsix },
+                             { "FIXED HLSL six distances (post-pass)", spv_fix_hlslsix, sizeof spv_fix_hlslsix },
                              { "FIXED HLSL minimal (rsx_spv_clipblock post-pass)", spv_fix_hlslmin, sizeof spv_fix_hlslmin },
                              { "FIXED HLSL rsx-shaped (post-pass)", spv_fix_hlslrsx, sizeof spv_fix_hlslrsx },
                              { "FIXED asm both_solo (post-pass)", spv_fix_bothsolo, sizeof spv_fix_bothsolo },

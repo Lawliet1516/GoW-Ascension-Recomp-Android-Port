@@ -77,3 +77,26 @@ What is established and what is not:
 ## 3. Consequence for the fix
 The `varying + discard` fallback is **not needed**: the driver does clip, provided the module declares `ClipDistance` inside a `Block`. The fix is on the SPIR-V that the renderer produces
 (rewrite the standalone `ClipDistance` variable into a Block member), which preserves the clipping semantics exactly (still hardware clipping, no extra fragment work, no interpolation differences).
+
+---
+
+# The fix and its verification (22/11/2026)
+
+**Fix** (commit 4dbfe97): `render/libs/video/rsx_spv_clipblock.h`, called from `translate()` in `rsx_shader_spirv.cpp` for vertex shaders, right after glslang produced the SPIR-V (so the result is also what
+the translation cache stores). It rewrites the standalone `BuiltIn ClipDistance` output variable into a one-member `Block` struct (`OpMemberDecorate`, `OpDecorate Block`, a new struct and pointer type, `%int_0` as the
+first index of every access chain, and an access chain in front of a whole-array `OpStore`/`OpLoad`). Clipping stays fixed-function; only the declaration form changes. It is fail-safe: a module with an unknown use of the variable,
+a second `ClipDistance` decoration, or an existing Block with `BuiltIn` members (a second Block is invalid SPIR-V) is returned unchanged. `PS3RECOMP_SPV_CLIPBLOCK=0` disables it (used for the A/B below).
+
+| check | result | evidence |
+|---|---|---|
+| host: the module of the scene (`095007ee8a1baa92`), both HLSL shaders, both hand-assembled standalone shaders and a six-distance shader are rewritten and `spirv-val --target-env vulkan1.0` valid; modules that are already Block-form, have no clip, or are fragment shaders come back byte-identical | pass | `results/clip_repro/post_pass_host_test.txt` |
+| device, independent harness, executable and APK+layer (same pattern): standalone variants fail (12 cases), **every FIXED variant clips 4/4**, including the whole-array-store form and the six-distance shader with only plane 5 tested | 52/64 pass; the 12 failures are exactly the unfixed standalone variants | `run_executable_no_layer.txt`, `run_apk_validation_layer.txt` |
+| device, renderer scene, A/B in the same APK: `--clip` with the post-pass off `0xFFFF0000` MISMATCH, on `0xFF101830` OK; `--clip-keep` OK in both | pass | `scene_ab_clipblock.txt` |
+| device, the 30 scene runs with the validation layer (positive control in `r1_results.md`) | **30/30 pass**, 0 validation errors, 0 warnings, `debug.vulkan.layers` reset | `results/r2_table.md` |
+
+## What this does not show
+- The scene checks one pixel, on one primitive. **Not tested**: partial clipping through the renderer (the repro does test it, case C, 2048/4096 px with the edge at column 32), several planes with different values in the renderer,
+  interpolation at plane edges for an oblique plane, depth, MSAA. The post-pass does not touch the position, interpolants, depth or sample state, but that is an argument, not a test.
+- One device, one driver build (Adreno 710, Vulkan 1.1.128, driverVersion 0x80267063, Android 16). Other Adreno drivers may or may not need this; the Block form is valid everywhere.
+- The post-pass applies to the `--clip` module shape the HLSL front end emits (glslang 11 here). A different glslang version that changes the form falls into the fail-safe (unchanged), and the A/B would show it.
+- The failing form is accepted by `spirv-val` and the layer; whether the specification requires the Block form was not re-read. "Driver defect" remains a reading of the evidence.

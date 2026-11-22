@@ -1,5 +1,5 @@
 > **CORRECTION (22/11/2026):** the "`--clip`: what is established" section below concluded that the driver ignores `ClipDistance`. An independent repro (`clip_repro/README_RESULTS.md`) shows the
-> driver clips correctly (12/12), so that conclusion is **withdrawn**; the cause is **a SPIR-V declaration form** the driver mishandles (standalone `BuiltIn ClipDistance` variable), isolated in `clip_repro/README_RESULTS.md` ("Root cause"). Fix pending.
+> driver clips correctly (12/12), so that conclusion is **withdrawn**; the cause is **a SPIR-V declaration form** the driver mishandles (standalone `BuiltIn ClipDistance` variable), isolated in `clip_repro/README_RESULTS.md` ("Root cause"). **Fixed** (commit 4dbfe97): `--clip` now passes and the 30 runs are 30/30 with the validation layer (`results/r2_table.md`, "The fix and its verification" in `clip_repro/README_RESULTS.md`).
 
 # R1: the 30 scene runs inside the APK with the Khronos validation layer (22/11/2026)
 

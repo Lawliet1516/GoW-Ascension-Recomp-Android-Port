@@ -11,7 +11,7 @@ for s in clip1.vert clip4all.vert clip4rsx.vert solid.frag; do
   "$SH/spirv-dis" "$OUT/spv/$s.spv" > "$OUT/spv/$s.dis.txt"
   "$SH/glslc" --target-env=vulkan1.0 -O0 -mfmt=c "$HERE/shaders/$s" -o "$OUT/spv/$s.inc"
 done
-for s in hlsl_min hlsl_rsx; do   # HLSL front end (glslang via shaderc): the language the renderer's shaders are written in
+for s in hlsl_min hlsl_rsx hlsl_six; do   # HLSL front end (glslang via shaderc): the language the renderer's shaders are written in
   "$SH/glslc" -x hlsl -fshader-stage=vertex -fentry-point=main --target-env=vulkan1.0 -O0 "$HERE/shaders/$s.vs.hlsl" -o "$OUT/spv/$s.vert.spv"
   "$SH/spirv-val" --target-env vulkan1.0 "$OUT/spv/$s.vert.spv"; "$SH/spirv-dis" "$OUT/spv/$s.vert.spv" > "$OUT/spv/$s.vert.dis.txt"
   "$SH/glslc" -x hlsl -fshader-stage=vertex -fentry-point=main --target-env=vulkan1.0 -O0 -mfmt=c "$HERE/shaders/$s.vs.hlsl" -o "$OUT/spv/$s.vert.inc"
@@ -24,7 +24,7 @@ for m in block clip_solo pos_solo both_solo both_solo_arr; do   # hand-assembled
 done
 # the renderer's post-pass (render/libs/video/rsx_spv_clipblock.h) applied to the failing modules: they must clip when run through the same harness
 g++ -std=c++17 -O1 "$HERE/tools/spv_clipblock_test.cpp" -o "$OUT/spv_clipblock_test"
-for m in hlsl_min.vert hlsl_rsx.vert asm_both_solo asm_both_solo_arr; do
+for m in hlsl_min.vert hlsl_rsx.vert hlsl_six.vert asm_both_solo asm_both_solo_arr; do
   src="$OUT/spv/$m.spv"; dst="$OUT/spv/fix_$m.spv"
   "$OUT/spv_clipblock_test" "$src" "$dst" | sed "s/^/post-pass $m: /"; "$SH/spirv-val" --target-env vulkan1.0 "$dst"; "$SH/spirv-dis" "$dst" > "$OUT/spv/fix_$m.dis.txt"
   python3 -c "import struct,sys; d=open(sys.argv[1],'rb').read(); w=struct.unpack('<%dI'%(len(d)//4),d); print('{'+','.join('0x%08x'%x for x in w)+'}')" "$dst" > "$OUT/spv/fix_$m.inc"
