@@ -5,9 +5,12 @@ Position / ClipDistance are declared, to isolate which declaration form the Adre
   clip_solo  : Position in a Block, ClipDistance a standalone Output variable decorated BuiltIn
   pos_solo   : ClipDistance alone in a Block, Position a standalone Output variable
   both_solo  : both standalone variables (what the HLSL front end emits), direct stores
+  both_solo_arr : like both_solo but the whole float[4] is stored at once (exercises the rewrite of a whole-array OpStore)
 usage: gen_spvasm.py <mode> > file.spvasm"""
 import sys
 mode = sys.argv[1]
+arrstore = mode == 'both_solo_arr'
+if arrstore: mode = 'both_solo'
 pos_in_block  = mode in ('block', 'clip_solo')
 clip_in_block = mode in ('block', 'pos_solo')
 members = []
@@ -43,6 +46,8 @@ w('%p = OpLoad %v2 %pin'); w('%x = OpCompositeExtract %float %p 0'); w('%y = OpC
 if pos_in_block: w('%pp = OpAccessChain %pov4 %blk %int_0')
 w('OpStore %pp %pos4' if pos_in_block else 'OpStore %posv %pos4')
 vals = ['%fh', '%d', '%fh', '%fh']
+if arrstore:
+    w('%arrv = OpCompositeConstruct %arr4 ' + ' '.join(vals)); w('OpStore %clipv %arrv'); w('OpReturn'); w('OpFunctionEnd'); print('\n'.join(out)); sys.exit(0)
 for k in range(4):
     if clip_in_block:
         idx = members.index('clip')

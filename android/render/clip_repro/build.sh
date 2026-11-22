@@ -16,11 +16,18 @@ for s in hlsl_min hlsl_rsx; do   # HLSL front end (glslang via shaderc): the lan
   "$SH/spirv-val" --target-env vulkan1.0 "$OUT/spv/$s.vert.spv"; "$SH/spirv-dis" "$OUT/spv/$s.vert.spv" > "$OUT/spv/$s.vert.dis.txt"
   "$SH/glslc" -x hlsl -fshader-stage=vertex -fentry-point=main --target-env=vulkan1.0 -O0 -mfmt=c "$HERE/shaders/$s.vs.hlsl" -o "$OUT/spv/$s.vert.inc"
 done
-for m in block clip_solo pos_solo both_solo; do   # hand-assembled: only the declaration form of Position/ClipDistance differs (tools/gen_spvasm.py)
+for m in block clip_solo pos_solo both_solo both_solo_arr; do   # hand-assembled: only the declaration form of Position/ClipDistance differs (tools/gen_spvasm.py)
   python3 "$HERE/tools/gen_spvasm.py" $m > "$OUT/spv/asm_$m.spvasm"
   "$SH/spirv-as" --target-env vulkan1.0 "$OUT/spv/asm_$m.spvasm" -o "$OUT/spv/asm_$m.spv"; "$SH/spirv-val" --target-env vulkan1.0 "$OUT/spv/asm_$m.spv"
   "$SH/spirv-dis" "$OUT/spv/asm_$m.spv" > "$OUT/spv/asm_$m.dis.txt"
   python3 -c "import struct,sys; d=open(sys.argv[1],'rb').read(); w=struct.unpack('<%dI'%(len(d)//4),d); print('{'+','.join('0x%08x'%x for x in w)+'}')" "$OUT/spv/asm_$m.spv" > "$OUT/spv/asm_$m.inc"
+done
+# the renderer's post-pass (render/libs/video/rsx_spv_clipblock.h) applied to the failing modules: they must clip when run through the same harness
+g++ -std=c++17 -O1 "$HERE/tools/spv_clipblock_test.cpp" -o "$OUT/spv_clipblock_test"
+for m in hlsl_min.vert hlsl_rsx.vert asm_both_solo asm_both_solo_arr; do
+  src="$OUT/spv/$m.spv"; dst="$OUT/spv/fix_$m.spv"
+  "$OUT/spv_clipblock_test" "$src" "$dst" | sed "s/^/post-pass $m: /"; "$SH/spirv-val" --target-env vulkan1.0 "$dst"; "$SH/spirv-dis" "$dst" > "$OUT/spv/fix_$m.dis.txt"
+  python3 -c "import struct,sys; d=open(sys.argv[1],'rb').read(); w=struct.unpack('<%dI'%(len(d)//4),d); print('{'+','.join('0x%08x'%x for x in w)+'}')" "$dst" > "$OUT/spv/fix_$m.inc"
 done
 CFLAGS="-std=gnu11 -O1 -g -Wall -Wextra -Wno-unused-parameter -I$OUT/spv"
 "$CC" $CFLAGS "$HERE/clip_repro.c" -o "$OUT/clip_repro" -lvulkan -llog

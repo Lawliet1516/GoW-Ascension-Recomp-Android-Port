@@ -39,6 +39,21 @@ static const uint32_t spv_asm_possolo[]   =
 static const uint32_t spv_asm_bothsolo[]  = 
 #include "asm_both_solo.inc"
 ;
+static const uint32_t spv_asm_bothsoloarr[] =
+#include "asm_both_solo_arr.inc"
+;
+static const uint32_t spv_fix_hlslmin[]   =
+#include "fix_hlsl_min.vert.inc"
+;
+static const uint32_t spv_fix_hlslrsx[]   =
+#include "fix_hlsl_rsx.vert.inc"
+;
+static const uint32_t spv_fix_bothsolo[]  =
+#include "fix_asm_both_solo.inc"
+;
+static const uint32_t spv_fix_bothsoloarr[] =
+#include "fix_asm_both_solo_arr.inc"
+;
 static const uint32_t spv_frag[]     = 
 #include "solid.frag.inc"
 ;
@@ -134,7 +149,12 @@ static int clip_main(void)
                              { "asm block: Position+ClipDistance in a Block", spv_asm_block, sizeof spv_asm_block },
                              { "asm clip_solo: Position in Block, ClipDistance standalone", spv_asm_clipsolo, sizeof spv_asm_clipsolo },
                              { "asm pos_solo: ClipDistance in Block, Position standalone", spv_asm_possolo, sizeof spv_asm_possolo },
-                             { "asm both_solo: both standalone, direct stores", spv_asm_bothsolo, sizeof spv_asm_bothsolo } };
+                             { "asm both_solo: both standalone, direct stores", spv_asm_bothsolo, sizeof spv_asm_bothsolo },
+                             { "asm both_solo_arr: both standalone, whole-array store", spv_asm_bothsoloarr, sizeof spv_asm_bothsoloarr },
+                             { "FIXED HLSL minimal (rsx_spv_clipblock post-pass)", spv_fix_hlslmin, sizeof spv_fix_hlslmin },
+                             { "FIXED HLSL rsx-shaped (post-pass)", spv_fix_hlslrsx, sizeof spv_fix_hlslrsx },
+                             { "FIXED asm both_solo (post-pass)", spv_fix_bothsolo, sizeof spv_fix_bothsolo },
+                             { "FIXED asm both_solo_arr, whole-array store (post-pass)", spv_fix_bothsoloarr, sizeof spv_fix_bothsoloarr } };
     /* d[0..3]: distance at the vertices (-1,-1) (1,-1) (-1,1) (1,1) */
     const Case cases[] = {
         { "A all +1.0",             { 1, 1, 1, 1 },     0.0f, 1 },
